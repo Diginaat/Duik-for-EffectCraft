@@ -74,11 +74,11 @@ function buildAutomationTab(ui) {
     }
 
     function button(parent, label, name, run) {
-        parent.add("button", undefined, label, { name: name }).onClick = function () {
+        addDisplayButton(parent, label, name).onClick = function () {
             try { status.text = run(); } catch (error) { status.text = error.message; }
         };
     }
-    function row() { return ui.add("group"); }
+    function row() { return addCommandRow(ui); }
 
     // Expressions map each dimension the same way for numbers and arrays.
     var each = "function each(v, f) { return typeof v === 'number' ? f(v, 0) : v.map(f); }\n";

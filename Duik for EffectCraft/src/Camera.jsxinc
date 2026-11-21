@@ -16,8 +16,9 @@ function buildCameraTab(panel) {
         for (var n = 2; c.layer(name); n++) name = base + " " + n;
         return name;
     }
+    var tools = addCommandRow(panel);
     function button(label, name, task) {
-        panel.add("button", undefined, label, { name: name }).onClick = function () {
+        addDisplayButton(tools, label, name).onClick = function () {
             app.beginUndoGroup(label);
             try { status.text = task(comp()); }
             catch (error) { status.text = error.message; }

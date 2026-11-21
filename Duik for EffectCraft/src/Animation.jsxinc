@@ -95,18 +95,14 @@ function buildAnimationTab(panel) {
     }
 
     function button(parent, label, name, run) {
-        parent.add("button", undefined, label, { name: name }).onClick = function () {
+        addDisplayButton(parent, label, name).onClick = function () {
             app.beginUndoGroup(label);
             try { status.text = run(comp()); }
             catch (error) { status.text = error.message; }
             finally { app.endUndoGroup(); }
         };
     }
-    function row() {
-        var group = panel.add("group");
-        group.alignChildren = ["fill", "center"];
-        return group;
-    }
+    function row() { return addCommandRow(panel); }
 
     function interpolate(label, inType, outType, inInfluence, outInfluence) {
         return function (c) {

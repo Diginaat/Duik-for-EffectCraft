@@ -4,27 +4,32 @@ function buildRiggingTab(panel) {
     panel.add("statictext", undefined, "Select three 2D layers in timeline order:");
     panel.add("statictext", undefined, "upper limb, lower limb, target null.");
     panel.add("statictext", undefined, "For one bone: select one limb above its target null.");
-    var build = panel.add("button", undefined, "Build Two-Bone IK", { name: "buildIk" });
-    var buildSwitchable = panel.add("button", undefined, "Build Two-Bone IK/FK", { name: "buildIkFk" });
-    var match = panel.add("button", undefined, "Match Pose and Switch IK/FK", { name: "matchIkFk" });
-    var buildOne = panel.add("button", undefined, "Build One-Bone IK/FK", { name: "buildOneIkFk" });
-    var buildThree = panel.add("button", undefined, "Build Three-Bone IK", { name: "buildThreeIk" });
-    buildThree.helpTip = "Select three limbs from root to tip, above their target null.";
-    var buildBezier = panel.add("button", undefined, "Build Bézier IK", { name: "buildBezierIk" });
-    buildBezier.helpTip = "Select 2–16 limbs, then start handle, end handle, and tip nulls in timeline order.";
-    var buildBezierFk = panel.add("button", undefined, "Build Bézier FK", { name: "buildBezierFk" });
-    buildBezierFk.helpTip = "Select 2–16 limbs, then root, start handle, end handle, and tip nulls in timeline order.";
+    var twoBone = addCommandRow(panel);
+    var build = addDisplayButton(twoBone, "Build Two-Bone IK", "buildIk");
+    var buildSwitchable = addDisplayButton(twoBone, "Build Two-Bone IK/FK", "buildIkFk");
+    var match = addDisplayButton(twoBone, "Match Pose and Switch IK/FK", "matchIkFk");
+    var mirror = addDisplayButton(twoBone, "Mirror IK", "mirrorIk");
+    mirror.helpTip += ": Select one two-bone target null. Flip the elbow or knee without moving the target.";
+    var chains = addCommandRow(panel);
+    var buildOne = addDisplayButton(chains, "Build One-Bone IK/FK", "buildOneIkFk");
+    var buildThree = addDisplayButton(chains, "Build Three-Bone IK", "buildThreeIk");
+    buildThree.helpTip += ": Select three limbs from root to tip, above their target null.";
+    var buildBezier = addDisplayButton(chains, "Build Bézier IK", "buildBezierIk");
+    buildBezier.helpTip += ": Select 2–16 limbs, then start handle, end handle, and tip nulls in timeline order.";
+    var buildBezierFk = addDisplayButton(chains, "Build Bézier FK", "buildBezierFk");
+    buildBezierFk.helpTip += ": Select 2–16 limbs, then root, start handle, end handle, and tip nulls in timeline order.";
     var templates = panel.add("group");
     var template = templates.add("dropdownlist", undefined, ["Arm", "Leg", "Spine", "Tail", "Hair"], { name: "limbTemplate" });
     template.selection = 0;
-    var buildTemplate = templates.add("button", undefined, "Create Template", { name: "buildLimbTemplate" });
-    var buildMaster = panel.add("button", undefined, "Group IK/FK Rigs Under Master", { name: "buildRigMaster" });
-    buildMaster.helpTip = "Select the target nulls of unparented two-bone IK/FK rigs.";
+    var buildTemplate = addDisplayButton(templates, "Create Template", "buildLimbTemplate");
+    var buildMaster = addDisplayButton(addCommandRow(panel), "Group IK/FK Rigs Under Master", "buildRigMaster");
+    buildMaster.helpTip += ": Select the target nulls of unparented two-bone IK/FK rigs.";
     var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
     status.preferredSize = [300, 64];
 
     function magnitude(x, y) { return Math.sqrt(x * x + y * y); }
     var rigTag = "// EC-Duik-IKFK-v1 ";
+    var ikTag = "// EC-Duik-IK-v1 ";
 
     function requirePlain(property, label) {
         if (!property || property.numKeys || property.expression) {
@@ -256,6 +261,16 @@ function buildRiggingTab(panel) {
         return installRig(forward ? "Build Bézier FK" : "Build Bézier IK", forward ? root : target, [], driven, expressions);
     }
 
+    // Keep the deformed bone exactly on its solved segment, even for artwork drawn off-axis.
+    // Returns local scale multipliers and the rotation correction for the chosen bone axis.
+    function limbShape(ratio, offset) {
+        var x = Math.cos(offset), y = -Math.sin(offset);
+        var sx = Math.abs(x) >= Math.abs(y) ? ratio : 1/ratio;
+        var sy = sx === ratio ? 1/ratio : ratio;
+        var n = ratio / Math.sqrt(x*x*sx*sx + y*y*sy*sy);
+        return [sx*n, sy*n, Math.atan2(y*x*(sx-sy), x*x*sx+y*y*sy) * 180/Math.PI];
+    }
+
     function makeRig(comp, switchable, templateLayers) {
         var layers = templateLayers || selectedLimb(comp), upper = layers[0], lower = layers[1], target = layers[2];
         var root = upper.transform.position;
@@ -265,10 +280,8 @@ function buildRiggingTab(panel) {
         requirePlain(elbow, "Lower Position");
         requirePlain(upperRotation, "Upper Rotation");
         requirePlain(lowerRotation, "Lower Rotation");
-        if (switchable) {
-            requirePlain(upper.transform.scale, "Upper Scale");
-            requirePlain(lower.transform.scale, "Lower Scale");
-        }
+        requirePlain(upper.transform.scale, "Upper Scale");
+        requirePlain(lower.transform.scale, "Lower Scale");
         if (root.expression || target.transform.position.expression) {
             throw new Error("Remove existing root/target Position expressions to avoid cycles.");
         }
@@ -290,31 +303,35 @@ function buildRiggingTab(panel) {
             "var x = c[0] - a[0], y = c[1] - a[1];\n" +
             "var d = Math.sqrt(x*x + y*y);\n" +
             "var h = d > 0.000001 ? Math.atan2(y,x) : " + Math.atan2(dy, dx) + ";\n" +
-            "var l1 = " + l1 + ", l2 = " + l2 + ";\n";
-        if (switchable) source += "var driver = " + targetRef + ";\n" +
-            'var fk = driver.effect("Use FK")(1) > 0;\n' +
-            'var stretch = !fk && driver.effect("Stretch IK")(1) > 0 ? Math.max(1, d/(l1+l2)) : 1;\n' +
-            "l1 *= stretch; l2 *= stretch;\n";
+            "var l1 = " + l1 + ", l2 = " + l2 + ";\n" +
+            "var driver = " + targetRef + ";\n" +
+            "var fk = " + (switchable ? 'driver.effect("Use FK")(1) > 0' : "false") + ";\n" +
+            'var ratio = fk ? 1 : 1 + Math.max(-75, Math.min(100, driver.effect("Squash & Stretch")(1)*1))/100;\n' +
+            'var stretch = !fk && driver.effect("Stretch IK")(1) > 0 ? Math.max(1, d/((l1+l2)*ratio)) : 1;\n' +
+            "l1 *= ratio*stretch; l2 *= ratio*stretch;\n" + limbShape.toString() + "\n";
         var scaleSource = source;
         source +=
             "var r = Math.max(Math.abs(l1-l2), Math.min(l1+l2, d));\n" +
             "var k = r > 0.000001 ? (l1*l1+r*r-l2*l2)/(2*l1*r) : 0;\n" +
-            (switchable ? 'var bend = driver.effect("Flip IK Bend")(1) > 0 ? -1 : 1;\n' : "") +
-            "var ang = h + " + (switchable ? "bend * " : "") + "(" + side + ") * Math.acos(Math.max(-1,Math.min(1,k)));\n" +
+            'var bend = driver.effect("Flip IK Bend")(1) > 0 ? -1 : 1;\n' +
+            "var ang = h + bend * (" + side + ") * Math.acos(Math.max(-1,Math.min(1,k)));\n" +
             "var ex = Math.cos(ang)*l1, ey = Math.sin(ang)*l1;\n";
         var driven = [upperRotation, elbow, lowerRotation];
-        var upperAngle = "ang * 180 / Math.PI + (" + upperOffset + ")";
-        var lowerAngle = "Math.atan2(Math.sin(h)*r-ey, Math.cos(h)*r-ex) * 180 / Math.PI + (" + lowerOffset + ")";
+        var upperShape = "limbShape(ratio," + upperOffset * Math.PI / 180 + ")";
+        var lowerShape = "limbShape(ratio," + lowerOffset * Math.PI / 180 + ")";
+        var upperAngle = "ang * 180 / Math.PI + (" + upperOffset + ") + " + upperShape + "[2]";
+        var lowerAngle = "Math.atan2(Math.sin(h)*r-ey, Math.cos(h)*r-ex) * 180 / Math.PI + (" + lowerOffset + ") + " + lowerShape + "[2]";
         var controls = [
-            ["Use FK", "ADBE Checkbox Control"],
-            ["FK Shoulder", "ADBE Angle Control"],
-            ["FK Elbow", "ADBE Angle Control"],
             ["Flip IK Bend", "ADBE Checkbox Control"],
-            ["Stretch IK", "ADBE Checkbox Control"]
+            ["Stretch IK", "ADBE Checkbox Control"],
+            ["Squash & Stretch", "ADBE Slider Control"]
         ];
+        var names = layers.map(function (layer) { return layer.name; });
         if (switchable) {
-            var metadata = { layers: layers.map(function (layer) { return layer.name; }), restUpper: upperRotation.value,
-                restLower: lowerRotation.value, lowerOffset: lowerOffset, l2: l2, side: side, stretchReach: l1 + l2 };
+            controls = [["Use FK", "ADBE Checkbox Control"], ["FK Shoulder", "ADBE Angle Control"],
+                ["FK Elbow", "ADBE Angle Control"]].concat(controls);
+            var metadata = { layers: names, restUpper: upperRotation.value,
+                restLower: lowerRotation.value, lowerOffset: lowerOffset, l2: l2, side: side, stretchReach: l1 + l2, squashStretch: true };
             source = rigTag + JSON.stringify(metadata) + "\n" + source;
             source += 'var shoulder = driver.effect("FK Shoulder")(1) * 1;\n' +
                 'var elbow = driver.effect("FK Elbow")(1) * 1;\n' +
@@ -324,16 +341,15 @@ function buildRiggingTab(panel) {
                 "}\n";
             upperAngle = "fk ? (" + upperRotation.value + ") + shoulder : " + upperAngle;
             lowerAngle = "fk ? (" + lowerRotation.value + ") + shoulder + elbow : " + lowerAngle;
-        }
+        } else source = ikTag + JSON.stringify({ layers: names }) + "\n" + source;
         var expressions = [source + upperAngle + ";", source + "[a[0] + ex, a[1] + ey];", source + lowerAngle + ";"];
-        if (switchable) {
-            var scaleExpression = scaleSource + "value.map(function (axis) { return axis * stretch; });";
-            driven.push(upper.transform.scale, lower.transform.scale);
-            expressions.push(scaleExpression, scaleExpression);
-        }
+        driven.push(upper.transform.scale, lower.transform.scale);
+        [upperShape, lowerShape].forEach(function (shape) {
+            expressions.push(scaleSource + "var s = " + shape + "; [value[0]*s[0]*stretch, value[1]*s[1]*stretch];");
+        });
 
         return installRig(switchable ? "Build Two-Bone IK/FK" : "Build Two-Bone IK",
-            target, switchable ? controls : [], driven, expressions, !!templateLayers);
+            target, controls, driven, expressions, !!templateLayers);
     }
 
     function makeLimbTemplate(comp, leg) {
@@ -408,19 +424,65 @@ function buildRiggingTab(panel) {
         }
     }
 
-    function rigSpec(layers) {
+    function rigSpec(layers, tag) {
+        tag = tag || rigTag;
         var upper = layers[0], lower = layers[1];
         var ur = upper.transform.rotation, lr = lower.transform.rotation;
         var elbow = lower.transform.position;
         var header = (ur.expression || "").split("\n")[0];
-        if (header.indexOf(rigTag) !== 0 || ![ur, lr, elbow].every(function (p) {
+        if (header.indexOf(tag) !== 0 || ![ur, lr, elbow].every(function (p) {
             return (p.expression || "").split("\n")[0] === header && p.expressionEnabled && !p.expressionError;
-        })) throw new Error("Select a working two-bone IK/FK rig built with this version.");
-        var spec = JSON.parse(header.slice(rigTag.length));
+        })) throw new Error("Select a working two-bone rig built with this version.");
+        var spec = JSON.parse(header.slice(tag.length));
         if (JSON.stringify(spec.layers) !== JSON.stringify(layers.map(function (layer) { return layer.name; }))) {
             throw new Error("Select the original upper, lower, and target layers.");
         }
         return spec;
+    }
+
+    function rigForTarget(comp, target, allowIk) {
+        var found = [];
+        for (var i = 1; i <= comp.numLayers; i++) {
+            var layer = comp.layer(i);
+            if (!(layer instanceof AVLayer)) continue;
+            var header = (layer.transform.rotation.expression || "").split("\n")[0];
+            var tag = allowIk && header.indexOf(ikTag) === 0 ? ikTag : rigTag;
+            if (header.indexOf(tag) !== 0) continue;
+            var spec = JSON.parse(header.slice(tag.length));
+            if (spec.layers[0] === layer.name && spec.layers[2] === target.name) found.push({ names: spec.layers, tag: tag });
+        }
+        if (found.length !== 1) throw new Error("No unique two-bone rig for " + target.name + ".");
+        var match = found[0], layers = match.names.map(function (name) { return comp.layer(name); });
+        if (layers.some(function (layer) { return !layer; }) || layers[2] !== target) throw new Error("Restore the original rig layer names.");
+        return { layers: layers, tag: match.tag };
+    }
+
+    function rigControl(target, name, matchName) {
+        var effect = target.property("ADBE Effect Parade").property(name), property = effect && effect.property(1);
+        if (!property || effect.matchName !== matchName || property.expression) throw new Error("Restore control: " + name);
+        return property;
+    }
+
+    function mirrorIk(comp) {
+        if (!(comp instanceof CompItem) || comp.selectedLayers.length !== 1 || !comp.selectedLayers[0].nullLayer) {
+            throw new Error("Select one two-bone IK target null (wrist or ankle).");
+        }
+        var target = comp.selectedLayers[0], rig = rigForTarget(comp, target, true), parent = target.parent;
+        if (parent && parent.threeDLayer) throw new Error("Use a shared 2D parent.");
+        rig.layers.forEach(function (layer) { requireLayer(comp, layer, parent); });
+        rigSpec(rig.layers, rig.tag);
+        if (rig.tag === rigTag && Number(rigControl(target, "Use FK", "ADBE Checkbox Control").value) > 0) {
+            throw new Error("Switch to IK before mirroring the bend.");
+        }
+        var flip = rigControl(target, "Flip IK Bend", "ADBE Checkbox Control"), next = !(Number(flip.value) > 0);
+        app.beginUndoGroup("Mirror IK");
+        try {
+            if (flip.numKeys) flip.setValueAtTime(comp.time, next);
+            else flip.setValue(next);
+        } finally {
+            app.endUndoGroup();
+        }
+        return "IK bend " + (next ? "mirrored" : "restored") + " on " + target.name + ".";
     }
 
     function groupRigs(comp) {
@@ -428,18 +490,7 @@ function buildRiggingTab(panel) {
         var targets = comp.selectedLayers.slice(), members = [];
         targets.forEach(function (target) {
             if (!target.nullLayer) throw new Error("Select only the IK/FK target nulls.");
-            var found = [];
-            for (var i = 1; i <= comp.numLayers; i++) {
-                var layer = comp.layer(i);
-                if (!(layer instanceof AVLayer)) continue;
-                var header = (layer.transform.rotation.expression || "").split("\n")[0];
-                if (header.indexOf(rigTag) !== 0) continue;
-                var spec = JSON.parse(header.slice(rigTag.length));
-                if (spec.layers[0] === layer.name && spec.layers[2] === target.name) found.push(spec.layers);
-            }
-            if (found.length !== 1) throw new Error("No unique two-bone IK/FK rig for " + target.name + ".");
-            var layers = found[0].map(function (name) { return comp.layer(name); });
-            if (layers.some(function (layer) { return !layer; }) || layers[2] !== target) throw new Error("Restore the original rig layer names.");
+            var layers = rigForTarget(comp, target, false).layers;
             layers.forEach(function (layer) {
                 requireLayer(comp, layer);
                 if (members.indexOf(layer) >= 0) throw new Error("Selected rigs share layers.");
@@ -475,14 +526,14 @@ function buildRiggingTab(panel) {
         var ur = upper.transform.rotation, lr = lower.transform.rotation;
         var elbow = lower.transform.position, goal = target.transform.position;
         var spec = rigSpec(layers);
-        var rack = target.property("ADBE Effect Parade");
         function control(name, matchName) {
-            var effect = rack.property(name), property = effect && effect.property(1);
-            if (!property || effect.matchName !== matchName || property.expression) throw new Error("Restore control: " + name);
-            return property;
+            return rigControl(target, name, matchName);
         }
         var mode = control("Use FK", "ADBE Checkbox Control");
         if (goal.expression) throw new Error("Target Position must not have an expression.");
+        if (spec.squashStretch && Math.abs(Number(control("Squash & Stretch", "ADBE Slider Control").value)) > 0.000001) {
+            throw new Error("Set Squash & Stretch to 0 before matching IK/FK.");
+        }
         var fromFk = Number(mode.value) > 0, edits;
         if (fromFk) {
             var root = upper.transform.position.value, joint = elbow.value;
@@ -541,6 +592,10 @@ function buildRiggingTab(panel) {
     match.onClick = function () {
         try { status.text = matchPose(app.project.activeItem); }
         catch (error) { status.text = "Pose not matched: " + error.message; }
+    };
+    mirror.onClick = function () {
+        try { status.text = mirrorIk(app.project.activeItem); }
+        catch (error) { status.text = "IK not mirrored: " + error.message; }
     };
     buildOne.onClick = function () {
         try { status.text = "One-bone IK/FK ready. Animate Position, Use FK, or FK Rotation on " + makeOneBone(app.project.activeItem) + "."; }

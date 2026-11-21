@@ -6,7 +6,11 @@ This EffectCraft plug-in bundle implements selected Duik-style workflows. It use
 
 ## Install
 
-Download `Duik-for-EffectCraft-<version>.zip` from [GitHub Releases](https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest) and unzip it. In EffectCraft 0.24.1, use **Effect → Install Effect Plug-in Bundle (Folder)…** and choose the `plug-in` folder. Open **Window → Duik for EffectCraft.jsx**. The bundle installs one dockable panel with **Rigging**, **Armature**, **Constraints**, **Animation**, **Automation**, **Layers**, and **Camera** sections. Switch sections with the icon bar at the top. The current section's name shows beside the icons, and hovering an icon shows its name. The sections are called tabs below. No `.wasm` module is needed: the pixel-effect ABI does not edit project layers.
+Download `Duik-for-EffectCraft-<version>.zip` from [GitHub Releases](https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest) and unzip it. In EffectCraft 0.24.1, use **Effect → Install Effect Plug-in Bundle (Folder)…** and choose the `plug-in` folder. Open **Window → Duik for EffectCraft.jsx**. The bundle installs one dockable panel with tabs for **Rigging**, **Armature**, **Constraints**, **Animation**, **Automation**, **Layers**, **Camera**, and **Settings**. No `.wasm` module is needed: the pixel-effect ABI does not edit project layers.
+
+Use **Toggle Icons / Text** above the tabs or **Settings → Button display**. **Icons** groups command buttons into compact grid rows; hover to read a command's name. **Text** stacks grouped commands in full-width rows with their full names. Input labels, field values, and status messages remain readable in both modes.
+
+**Documentation** and **GitHub** are text buttons at the bottom of the panel on every tab, even in Icons mode. **Documentation** opens the [online guide](https://www.diginaat.com/tools/effectcraft/duik/); **GitHub** opens the [project repository](https://github.com/Diginaat/Duik-for-EffectCraft) for releases, source, and issues. If EffectCraft blocks scripts from opening files, copy the URL shown in the footer and paste it into your browser.
 
 ## Rigging tab
 
@@ -31,9 +35,11 @@ Download `Duik-for-EffectCraft-<version>.zip` from [GitHub Releases](https://git
 
 For a switchable rig, choose **Build Two-Bone IK/FK** instead. In the target null's **Effect Controls**, **Use FK** off means animate target **Position**; on means animate **FK Shoulder** and **FK Elbow** as joint offsets from the rest pose. For a matched switch, select the original three layers and click **Match Pose and Switch IK/FK** at the desired frame. This keys the destination controls and switches modes in one undo step. FK → IK also sets **Flip IK Bend** when needed. It cannot match a fully folded pose with the tip at the shoulder. Rigs built before pose matching was introduced still work but cannot use automatic matching.
 
-New switchable rigs have a keyframeable **Stretch IK** checkbox, off by default. When on, both limbs scale uniformly past rest reach so the tip tracks the target. In-reach poses and FK keep their rest scale. Bring the target back within rest reach before matching a stretched pose to FK. Existing rigs are not modified; build a new rig to get stretch.
+**Mirror IK:** Select only the wrist or ankle target and click **Mirror IK** in Rigging. It flips the elbow or knee across the root-to-target line without moving either endpoint. If **Flip IK Bend** already has keys, the button sets a key at the playhead; otherwise it changes the static value. Supported on new two-bone rigs and older IK/FK rigs with the bend control and pose-matching metadata.
 
-Keep layer names unique; don't rename the upper layer, target null, or generated controls unless you update their expression references. Lower Position and both Rotations must not already be driven; switchable rigs also need unanimated Scale on both limb layers. Changes to artwork, anchors, or base scales do not recalculate limb lengths. No 3D or autorig. The generated expressions are saved in `.ecproj`.
+**Squash and stretch:** On either new two-bone rig, keyframe **Squash & Stretch** on the target (−75 to +100). Try −25 for shorter, thicker limbs and +25 for longer, thinner limbs. Width compensation works best when the artwork's length aligns with a local axis. **Stretch IK** is a separate checkbox, off by default; it adds uniform scale when the endpoint is beyond the adjusted reach. Neither control affects FK. Before an IK/FK match, set **Squash & Stretch** to 0 and bring an auto-stretched target back within rest reach. Existing rigs are not modified; build a new one for the new controls.
+
+Keep layer names unique; don't rename the upper layer, target null, or generated controls unless you update their expression references. Lower Position and both Rotations and Scales must not already have keys or expressions. Changes to artwork, anchors, or base scales do not recalculate limb lengths. No 3D or autorig. The generated expressions are saved in `.ecproj`.
 
 ## Armature tab
 
@@ -103,6 +109,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -IkFk
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -PoseMatch
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -Stretch
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -MirrorSquash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -MirrorSquash -IkFk
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -OneBone
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -ThreeBone
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-Rigging.ps1 -Bezier
@@ -115,4 +123,4 @@ The headless test loads the bundle as a palette, exercises the button with and w
 
 `Test-Tools.ps1` runs the cases in `Test-Tools.Cases.ps1` for the Constraints, Animation, Automation, Layers, and Camera tools and the body-part templates; `-Only 'Path*'` runs matching cases. Each case drives the panel, saves, and checks the reopened project.
 
-The desktop test installs the unified panel through the bundle installer if missing, verifies its seven section icons, then exercises layer creation, animated expressions, FK motion, artwork binding, and aim and position constraints in disposable compositions. If testing a rebuilt bundle, reinstall the panel first; EffectCraft won't overwrite an existing install.
+The desktop test installs the unified panel through the bundle installer if missing, verifies both display modes and all eight tabs, then exercises layer creation, animated expressions, FK motion, artwork binding, and aim and position constraints in disposable compositions. If testing a rebuilt bundle, reinstall the panel first; EffectCraft won't overwrite an existing install.

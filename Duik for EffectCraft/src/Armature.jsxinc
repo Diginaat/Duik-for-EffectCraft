@@ -26,8 +26,9 @@ function buildArmatureTab(panel) {
         }
     }
 
+    var tools = addCommandRow(panel);
     function button(label, id, run) {
-        panel.add("button", undefined, label, { name: id }).onClick = function () {
+        addDisplayButton(tools, label, id).onClick = function () {
             app.beginUndoGroup(label);
             try { status.text = run(); }
             catch (error) { status.text = error.message; }
@@ -227,6 +228,7 @@ function buildArmatureTab(panel) {
         return "Path constraint ready. Keyframe Path Progress on followers.";
     }
 
+    tools = addCommandRow(panel);
     button("Aim at Driver (Keep Offset)", "aim", function () { return constrain(true); });
     button("Follow Driver Position", "follow", function () { return constrain(false); });
     button("Add Weighted Parent Constraint", "parentWeight", weightedParent);

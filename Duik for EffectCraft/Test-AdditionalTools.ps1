@@ -56,21 +56,66 @@ try {
     $window = $opened.window
     $panel = @(Command 'scriptui.list' | Where-Object { $_.window -eq $window -and $_.kind -eq 'panel' -and $_.script -eq $name })
     if ($panel.Count -ne 1) { throw 'Unified plug-in did not open as a dockable panel.' }
-    # Sections switch through a row of drawn icon buttons; the visible page must sit below the toolbar.
-    function Layout { $root = (Command 'scriptui.get' @{window=$window}).root; return @{ header=$root.children[0]; pages=$root.children[1] } }
+    # Both display modes use the same command IDs and keep the current page.
+    function Layout { $root = (Command 'scriptui.get' @{window=$window}).root; return @{ header=$root.children[0]; pages=$root.children[1]; footer=$root.children[2] } }
+    function Buttons($widget) {
+        if ($widget.type -eq 'button') { $widget }
+        foreach ($child in $widget.children) { Buttons $child }
+    }
+    function Check-RiggingLayout($icons) {
+        Click 'tabRigging'
+        $current = Layout
+        $rigging = $current.pages.children[0]
+        $groups = @($rigging.children | Where-Object { $_.children.Count -eq 4 -and @($_.children | Where-Object type -eq 'button').Count -eq 4 })
+        if ($groups.Count -ne 2) { throw 'Expected two groups of four Rigging commands.' }
+        foreach ($group in $groups) {
+            $first = $group.children[0].bounds
+            $last = $group.children[3].bounds
+            if ($icons) {
+                if ($first[2] -ne 30 -or $first[3] -ne 30 -or $last[0] -le $first[0] -or $last[1] -ne $first[1]) { throw 'Icons must be compact and side by side.' }
+            } elseif ($last[1] -le $first[1] -or $last[0] -ne $first[0] -or $last[2] -ne $first[2] -or $first[2] -le 30) {
+                throw 'Text commands must be stacked at equal width.'
+            }
+        }
+        Click 'tabSettings'
+    }
     $layout = Layout
-    $bar = $layout.header.children | Where-Object { $_.name -eq 'duikTabs' }
-    $expectedTabs = 'tabRigging,tabArmature,tabConstraints,tabAnimation,tabAutomation,tabLayers,tabCamera'
-    if (($bar.children.name -join ',') -ne $expectedTabs -or @($bar.children | Where-Object { !$_.draw.Count }).Count) { throw 'Expected seven drawn section icons in the toolbar.' }
-    foreach ($index in 0..($bar.children.Count - 1)) {
-        Click $bar.children[$index].name
+    $expectedTabs = 'tabRigging,tabArmature,tabConstraints,tabAnimation,tabAutomation,tabLayers,tabCamera,tabSettings'
+    Click 'tabSettings'
+    $layout = Layout
+    $picker = $layout.pages.children[7].children[0].children[1]
+    $originalMode = $picker.selection[0]
+    Command 'scriptui.set' @{window=$window; widget='displayPicker'; value='Text'} | Out-Null
+    $layout = Layout
+    $textButtons = @((Buttons $layout.header) + (Buttons $layout.pages))
+    if (@($textButtons | Where-Object { !$_.text -or $_.draw.Count }).Count) { throw 'Text mode must render every button as text.' }
+    Check-RiggingLayout $false
+    Click 'displayMode'
+    $layout = Layout
+    if (!$layout.pages.children[7].visible -or $layout.pages.children[7].children[0].children[1].selection[0] -ne 0) { throw 'Toggle did not retain Settings or sync its picker.' }
+    $iconButtons = @((Buttons $layout.header) + (Buttons $layout.pages))
+    if ($iconButtons.Count -ne $textButtons.Count -or @($iconButtons | Where-Object { $_.text -or !$_.draw.Count -or !$_.helpTip }).Count) { throw 'Icon mode must draw every button and retain tooltips.' }
+    Check-RiggingLayout $true
+    $tabs = $iconButtons | Where-Object { $_.name -like 'tab*' }
+    if (($tabs.name -join ',') -ne $expectedTabs) { throw 'Expected eight section tabs.' }
+    foreach ($index in 0..($tabs.Count - 1)) {
+        Click $tabs[$index].name
         $layout = Layout
         $visible = @($layout.pages.children | Where-Object { $_.visible })
-        $title = ($layout.header.children | Where-Object { $_.name -eq 'sectionTitle' }).text
-        if ($visible.Count -ne 1 -or $visible[0] -ne $layout.pages.children[$index] -or $title -ne $bar.children[$index].helpTip) { throw "Icon $index did not switch to its section." }
+        $title = ($layout.header.children[0].children | Where-Object { $_.name -eq 'sectionTitle' }).text
+        if ($visible.Count -ne 1 -or $visible[0].name -ne $layout.pages.children[$index].name -or $title -ne $tabs[$index].helpTip) { throw "Icon $index did not switch to its section." }
         $toolbarBottom = $layout.header.bounds[1] + $layout.header.bounds[3]
         if ($visible[0].children[0].bounds[1] -lt $toolbarBottom) { throw "$title content overlaps the toolbar." }
+        $footerButtons = @(Buttons $layout.footer)
+        if ($layout.footer.name -ne 'duikFooter' -or !$layout.footer.visible -or ($footerButtons.name -join ',') -ne 'openDocs,openGitHub' -or @($footerButtons | Where-Object { !$_.visible }).Count -or $layout.footer.bounds[1] -lt ($visible[0].bounds[1] + $visible[0].bounds[3])) { throw "Documentation footer missing or overlaps $title." }
+        if (($footerButtons.text -join '|') -ne 'Documentation|GitHub' -or @($footerButtons | Where-Object { $_.draw.Count }).Count) { throw 'Documentation and GitHub must stay text-only in Icons mode.' }
     }
+    Command 'scriptui.set' @{window=$window; widget='displayPicker'; value='Text'} | Out-Null
+    $layout = Layout
+    $restoredButtons = @((Buttons $layout.header) + (Buttons $layout.pages))
+    if (($restoredButtons.text -join '|') -ne ($textButtons.text -join '|') -or @($restoredButtons | Where-Object { $_.draw.Count }).Count) { throw 'Returning to Text mode must restore all captions and clear icon drawings.' }
+    Command 'scriptui.set' @{window=$window; widget='displayPicker'; value=[int]$originalMode} | Out-Null
+    'PASS: icon grid, stacked text commands, eight tabs, and synchronized Settings.'
     Script @'
 var c = app.project.items.addComp("Tools Test", 320, 240, 1, 4, 24);
 c.openInViewer();

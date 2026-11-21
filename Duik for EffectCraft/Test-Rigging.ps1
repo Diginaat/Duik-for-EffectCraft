@@ -1,4 +1,4 @@
-param([string]$Cli = 'C:\Program Files\ArtCraft\EffectCraft\effectcraft-cli.exe', [switch]$IkFk, [switch]$PoseMatch, [switch]$Stretch, [switch]$OneBone, [switch]$ThreeBone, [switch]$Bezier, [switch]$BezierFk)
+param([string]$Cli = 'C:\Program Files\ArtCraft\EffectCraft\effectcraft-cli.exe', [switch]$IkFk, [switch]$PoseMatch, [switch]$Stretch, [switch]$OneBone, [switch]$ThreeBone, [switch]$Bezier, [switch]$BezierFk, [switch]$MirrorSquash)
 $ErrorActionPreference = 'Stop'
 $name = 'Duik for EffectCraft.jsx'
 $panel = Join-Path $PSScriptRoot "plug-in\$name"
@@ -17,6 +17,7 @@ function Invoke-Cli {
 
 try {
     if ($PoseMatch -and $Stretch) { throw 'Run -PoseMatch and -Stretch separately.' }
+    if ($MirrorSquash -and ($PoseMatch -or $Stretch -or $OneBone -or $ThreeBone -or $Bezier -or $BezierFk)) { throw 'Use -MirrorSquash alone or with -IkFk.' }
     if (($Bezier -or $BezierFk) -and ($OneBone -or $ThreeBone -or $IkFk -or $PoseMatch -or $Stretch -or ($Bezier -and $BezierFk))) { throw 'Run -Bezier or -BezierFk separately.' }
     if (($OneBone -or $ThreeBone) -and ($IkFk -or $PoseMatch -or $Stretch -or ($OneBone -and $ThreeBone))) { throw 'Run -OneBone or -ThreeBone separately.' }
     if ($PoseMatch -or $Stretch) { $IkFk = $true }
@@ -149,6 +150,46 @@ c.time = 1;
             @{command='scriptui.click'; params=@{widget='matchIkFk'}}
             @{command='scriptui.get'; params=@{}}
         )
+    } elseif ($MirrorSquash) {
+        $commands += @(
+            @{command='layer.select'; params=@{layers=@('Wrist')}}
+            @{command='script.run'; params=@{code=@'
+var c = app.project.activeItem, wrist = c.layer("Wrist"), p = wrist.transform.position;
+c.time = 0.5;
+p.setValueAtTime(1.25,[150,110]);
+p.setValueAtTime(1.5,[240,80]);
+'@}}
+            @{command='scriptui.click'; params=@{widget='mirrorIk'}}
+            @{command='scriptui.get'; params=@{}}
+            @{command='script.run'; params=@{code=@'
+var c = app.project.activeItem, fx = c.layer("Wrist").property("Effects"), flip = fx.property("Flip IK Bend").property(1);
+if (Number(flip.value) !== 1 || flip.numKeys) throw new Error("Mirror must change the static checkbox without adding a key");
+flip.setValueAtTime(0,true);
+var shape = fx.property("Squash & Stretch").property(1);
+shape.setValueAtTime(0.75,0);
+shape.setValueAtTime(1.25,-25);
+shape.setValueAtTime(1.5,25);
+c.time = 1.5;
+'@}}
+            @{command='scriptui.click'; params=@{widget='mirrorIk'}}
+            @{command='scriptui.get'; params=@{}}
+        )
+        if ($IkFk) {
+            $commands += @(
+                @{command='layer.select'; params=@{layers=@('Upper','Lower','Wrist')}}
+                @{command='scriptui.click'; params=@{widget='matchIkFk'}}
+                @{command='scriptui.get'; params=@{}}
+                @{command='script.run'; params=@{code=@'
+var c = app.project.activeItem, fx = c.layer("Wrist").property("Effects");
+fx.property("Use FK").property(1).setValueAtTime(0,false);
+fx.property("Use FK").property(1).setValueAtTime(1.75,true);
+c.time = 1.75;
+'@}}
+                @{command='layer.select'; params=@{layers=@('Wrist')}}
+                @{command='scriptui.click'; params=@{widget='mirrorIk'}}
+                @{command='scriptui.get'; params=@{}}
+            )
+        }
     } elseif ($IkFk) {
         $animate = @'
 var effects = app.project.activeItem.layer("Wrist").property("ADBE Effect Parade");
@@ -170,6 +211,8 @@ effects.property("FK Elbow").property(1).setValue(-90);
     if (!$details.Contains($ready)) { throw $details }
     if ($PoseMatch -and (!$details.Contains('Pose matched. Switched to FK.') -or !$details.Contains('Pose matched. Switched to IK.'))) { throw $details }
     if ($Stretch -and !$details.Contains('Move the target within rest reach before matching to FK.')) { throw $details }
+    if ($MirrorSquash -and (!$details.Contains('IK bend mirrored on Wrist.') -or !$details.Contains('IK bend restored on Wrist.'))) { throw $details }
+    if ($MirrorSquash -and $IkFk -and (!$details.Contains('Stretch to 0 before matching IK/FK.') -or !$details.Contains('Switch to IK before mirroring the bend.'))) { throw 'Expected squash and FK mirror rejection messages.' }
 
     $checkCode = @'
 var comp = app.project.item(1);
@@ -295,6 +338,30 @@ near(u.transform.scale.valueAtTime(1,false)[0],400/3,"stretch scale");
 near(l.transform.scale.valueAtTime(1,false)[1],400/3,"uniform stretch scale");
 if (wrist.property("Effects").property("Use FK").property(1).numKeys) throw new Error("Rejected match created mode keys");
 "PASS: saved rig tracks beyond reach with stretch on and clamps with stretch off.";
+'@
+    } elseif ($MirrorSquash) {
+        $checkCode += "`n" + @'
+var fx = wrist.property("Effects"), flip = fx.property("Flip IK Bend").property(1);
+near(flip.numKeys,2,"mirror key count");
+near(flip.keyTime(2),1.5,"mirror key time");
+near(Number(flip.valueAtTime(0.5,false)),1,"earlier bend retained");
+near(Number(flip.valueAtTime(1.5,false)),0,"bend restored");
+var joint = l.transform.position.valueAtTime(0.5,false);
+if (100*(joint[1]-80)-60*(joint[0]-60) >= 0) throw new Error("Elbow did not mirror");
+verify(1.25,150,110);
+verify(1.5,240,80);
+[u,l].forEach(function (limb) {
+    var s = limb.transform.scale;
+    near(s.valueAtTime(1.25,false)[0],75,"squashed length");
+    near(s.valueAtTime(1.25,false)[1],400/3,"squashed width");
+    near(s.valueAtTime(1.5,false)[0],125,"stretched length");
+    near(s.valueAtTime(1.5,false)[1],80,"stretched width");
+    if (fx.property("Use FK")) {
+        near(s.valueAtTime(1.75,false)[0],100,"FK length unaffected");
+        near(s.valueAtTime(1.75,false)[1],100,"FK width unaffected");
+    }
+});
+"PASS: mirrored bend, target tracking, squash and stretch persist after reopening.";
 '@
     } elseif ($IkFk) {
         $checkCode += "`n" + @'

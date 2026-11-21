@@ -10,16 +10,78 @@ var sectionIcons = {
         ["fill", [[12, 7], [17, 12], [12, 17], [7, 12]]]],
     Automation: [["line", [[2, 12], [4, 7], [6, 5], [8, 7], [10, 12], [12, 17], [14, 19], [16, 17], [18, 12], [20, 7], [22, 5]]]],
     Layers: [["poly", [[12, 3], [22, 8], [12, 13], [2, 8]]], ["line", [[2, 12], [12, 17], [22, 12]]], ["line", [[2, 16], [12, 21], [22, 16]]]],
-    Camera: [["poly", [[2, 7], [15, 7], [15, 18], [2, 18]]], ["poly", [[15, 11], [22, 7], [22, 18], [15, 14]]], ["dot", 6, 4, 2]]
+    Camera: [["poly", [[2, 7], [15, 7], [15, 18], [2, 18]]], ["poly", [[15, 11], [22, 7], [22, 18], [15, 14]]], ["dot", 6, 4, 2]],
+    Settings: [["dot", 12, 12, 3], ["poly", [[10,2],[14,2],[15,5],[18,6],[21,5],[23,9],[21,12],[23,15],[21,19],[18,18],[15,19],[14,22],[10,22],[9,19],[6,18],[3,19],[1,15],[3,12],[1,9],[3,5],[6,6],[9,5]]]]
 };
 
-// Adds a toggle-like icon button; `isActive` decides the highlighted look.
-function addIconButton(parent, key, name, isActive) {
-    var button = parent.add("button", undefined, "", { name: name });
-    button.preferredSize = [30, 30];
-    button.helpTip = key;
-    button.onDraw = function () {
-        var g = this.graphics, w = this.size[0], h = this.size[1], on = isActive(this);
+// Command pictograms keyed by stable widget ID. Each string describes one or more pen strokes.
+var commandIcons = {
+    displayMode: "3,5 21,5|12,5 12,20|8,20 16,20|3,5 3,9|21,5 21,9",
+    buildIk: "3,19 10,7 21,16|18,16 21,13 24,16 21,19 18,16",
+    buildIkFk: "2,17 8,6 16,12|12,20 22,20|19,17 22,20 19,23",
+    matchIkFk: "3,7 21,7 17,3|21,17 3,17 7,21",
+    mirrorIk: "12,2 12,22|2,17 8,5 8,17 2,17|22,17 16,5 16,17 22,17",
+    buildOneIkFk: "3,19 18,5|14,5 18,5 18,9|3,15 7,19 3,23 0,19 3,15",
+    buildThreeIk: "2,19 7,7 13,15 21,8|18,8 21,5 24,8 21,11 18,8",
+    buildBezierIk: "2,18 6,9 11,5 16,6 22,13|5,7 11,5 17,3|19,13 22,10 24,13 22,16 19,13",
+    buildBezierFk: "2,18 6,9 11,5 16,6 22,13|2,18 11,18 11,14|5,7 11,5 17,3",
+    buildLimbTemplate: "3,3 15,3 15,21 3,21 3,3|6,8 12,8|6,12 12,12|18,15 18,22|15,18 22,18",
+    buildRigMaster: "12,4 12,10 5,16|12,10 19,16|8,2 16,2 16,7 8,7 8,2|2,16 8,16 8,21 2,21 2,16|16,16 22,16 22,21 16,21 16,16",
+    buildFk: "3,20 7,10 17,5 13,15 3,20|19,15 19,23|15,19 23,19",
+    buildOverlapFk: "2,18 6,8 11,16 17,6|6,22 10,12 15,20 21,10",
+    bindArt: "2,15 10,7 14,7 17,10 17,14 9,22|8,12 16,4 20,4 23,7 23,11 15,19",
+    aim: "2,21 14,9|10,9 14,9 14,13|16,4 21,4 21,9|18,2 18,11|14,7 23,7",
+    follow: "3,15 10,15|7,12 10,15 7,18|14,5 22,5 22,13 14,13 14,5",
+    parentWeight: "3,6 21,6|12,6 12,12|8,13 16,13 19,21 5,21 8,13",
+    followPath: "2,19 7,8 12,6 17,12 22,6|13,19 21,19 18,16|21,19 18,22",
+    setDriver: "3,3 3,21|3,16 9,11 15,14 22,7|17,7 22,7 22,12",
+    connectKeys: "2,12 6,8 10,12 6,16 2,12|10,12 14,12|14,12 18,8 22,12 18,16 14,12",
+    effector: "12,2 19,5 22,12 19,19 12,22 5,19 2,12 5,5 12,2|8,12 12,8 16,12 12,16 8,12",
+    lockProperty: "4,11 20,11 20,21 4,21 4,11|8,11 8,7 10,4 14,4 16,7 16,11|12,15 12,18",
+    resetTransform: "6,7 11,4 17,5 21,10 20,16 16,20 9,20 4,16|6,2 6,7 11,7|12,9 12,15 15,15",
+    alignLayers: "2,4 22,4|6,8 11,8 11,20 6,20 6,8|15,8 20,8 20,15 15,15 15,8",
+    pinPath: "3,17 8,8 17,7 21,16|5,8 8,5 11,8 8,11 5,8|14,7 17,4 20,7 17,10 14,7",
+    keyLinear: "3,20 21,4",
+    keyEaseIn: "3,20 8,13 13,8 17,6 21,6",
+    keyEaseOut: "3,19 8,19 12,17 16,13 21,4",
+    keyEasyEase: "3,19 7,19 10,17 14,7 17,5 21,5",
+    keyHold: "3,18 15,18 15,6 21,6",
+    keySmooth: "3,17 6,12 10,10 14,14 18,12 21,7",
+    spatialLinear: "3,17 8,12 13,7 21,7|1,17 5,17|11,5 11,9|19,7 23,7",
+    keyRove: "8,12 12,8 16,12 12,16 8,12|2,12 5,9|2,12 5,15|22,12 19,9|22,12 19,15",
+    tween: "3,7 3,17|21,7 21,17|8,12 12,8 16,12 12,16 8,12",
+    freezePose: "12,2 12,22|3,7 21,17|3,17 21,7|8,4 12,8 16,4|8,20 12,16 16,20",
+    snapKeys: "4,5 4,13 7,18 12,20 17,18 20,13 20,5|4,10 8,10|16,10 20,10",
+    syncKeys: "12,3 12,21|2,8 9,8 6,5|22,16 15,16 18,13",
+    cleanKeys: "4,17 13,17 19,7 13,4 4,14 4,17|8,10 15,14|5,21 21,21",
+    sequenceLayers: "2,5 11,5|6,12 15,12|11,19 22,19",
+    exposure: "3,4 21,4 21,20 3,20 3,4|9,8 9,16|15,8 15,16",
+    copyAnim: "5,15 2,15 2,3 14,3 14,6|8,8 21,8 21,21 8,21 8,8|11,15 15,11 19,15 15,19 11,15",
+    pasteAnim: "7,5 4,5 4,22 20,22 20,5 17,5|8,3 16,3 16,7 8,7 8,3|8,15 12,11 16,15 12,19 8,15",
+    wiggle: "2,12 5,7 8,16 11,4 15,20 18,8 22,12",
+    random: "3,3 21,3 21,21 3,21 3,3|7,7 8,7|16,7 17,7|11,12 13,12|7,17 8,17|16,17 17,17",
+    swink: "4,5 20,5|12,5 17,16 15,19 12,16|5,14 6,18 10,21 16,21 21,17",
+    spring: "3,3 7,6 16,8 7,10 16,12 7,14 16,16 7,18 12,21",
+    cycleLoop: "7,5 16,5 20,8 20,11|17,8 20,11 23,8|17,19 8,19 4,16 4,13|1,16 4,13 7,16",
+    rollWheel: "12,4 17,6 20,12 17,18 12,20 7,18 4,12 7,6 12,4|12,4 12,20|4,12 20,12",
+    motionTrail: "2,19 4,18|7,16 9,14|12,12 14,10|16,7 19,4 22,7 19,10 16,7",
+    moveAway: "3,21 10,14|3,17 3,21 7,21|14,10 21,3|17,3 21,3 21,7",
+    bakeExpressions: "4,11 20,11 17,20 7,20 4,11|7,8 10,5 14,5 17,8|10,14 14,14",
+    toggleExpressions: "12,2 12,12|7,5 3,9 3,15 7,20 17,20 21,15 21,9 17,5",
+    removeExpressions: "3,6 21,6|8,6 8,3 16,3 16,6|6,6 7,21 17,21 18,6|10,10 10,17|14,10 14,17",
+    addControls: "3,5 15,5 15,17 3,17 3,5|6,11 12,11|9,8 9,14|19,15 19,23|15,19 23,19",
+    addZeros: "4,4 20,4 20,20 4,20 4,4|10,8 14,8 15,10 15,14 14,16 10,16 9,14 9,10 10,8",
+    addSolid: "3,6 17,6 17,19 3,19 3,6|18,3 22,3|20,1 20,5",
+    addAdjustment: "3,5 21,5 21,19 3,19 3,5|4,18 20,6|8,18 20,10|12,18 20,14",
+    renameLayers: "3,6 17,6 22,12 17,18 3,18 3,6|7,14 10,8 13,14|8,12 12,12|16,12 18,12",
+    loadNotes: "5,3 15,3 20,8 20,21 5,21 5,3|15,3 15,8 20,8|12,17 12,10 9,13|12,10 15,13",
+    saveNotes: "5,3 15,3 20,8 20,21 5,21 5,3|15,3 15,8 20,8|12,10 12,17 9,14|12,17 15,14",
+    camera2d: "2,6 15,6 15,17 2,17 2,6|15,9 22,5 22,18 15,14|6,20 15,20",
+    rigCamera: "12,2 22,7 22,17 12,22 2,17 2,7 12,2|2,7 12,12 22,7|12,12 12,22"
+};
+
+function drawButtonIcon(button, shapes, on) {
+        var g = button.graphics, w = button.size[0], h = button.size[1];
         var ink = on ? [1, 1, 1, 1] : [0.78, 0.78, 0.78, 1];
         var pen = g.newPen(g.PenType.SOLID_COLOR, ink, 1.6), brush = g.newBrush(g.BrushType.SOLID_COLOR, ink);
         g.newPath();
@@ -32,7 +94,7 @@ function addIconButton(parent, key, name, isActive) {
             for (var i = 1; i < points.length; i++) g.lineTo(points[i][0] + dx, points[i][1] + dy);
             if (close) g.closePath();
         }
-        sectionIcons[key].forEach(function (shape) {
+        shapes.forEach(function (shape) {
             if (shape[0] === "dot") {
                 g.newPath();
                 g.ellipsePath(shape[1] - shape[3] + dx, shape[2] - shape[3] + dy, shape[3] * 2, shape[3] * 2);
@@ -40,6 +102,46 @@ function addIconButton(parent, key, name, isActive) {
             } else if (shape[0] === "fill") { path(shape[1], true); g.fillPath(brush); }
             else { path(shape[1], shape[0] === "poly"); g.strokePath(pen); }
         });
-    };
+}
+
+// Change presentation on existing widgets; handlers, inputs, and the current page stay intact.
+var displayButtons = [];
+var commandRows = [];
+
+// Keep each command on the same widget: only the group's flow changes.
+function addCommandRow(parent) {
+    var group = parent.add("group");
+    group.alignment = ["fill", "top"];
+    group.spacing = 4;
+    commandRows.push(group);
+    return group;
+}
+
+function addDisplayButton(parent, label, name, isActive) {
+    var shapes = sectionIcons[label];
+    if (!shapes) {
+        if (!commandIcons[name]) throw new Error("Missing Duik icon: " + name);
+        shapes = commandIcons[name].split("|").map(function (stroke) {
+            return ["line", stroke.split(" ").map(function (point) { return point.split(",").map(Number); })];
+        });
+    }
+    var button = parent.add("button", undefined, label, { name: name });
+    button.helpTip = label;
+    displayButtons.push({ button: button, label: label, draw: function () {
+        drawButtonIcon(this, shapes, isActive ? isActive() : false);
+    }});
     return button;
+}
+
+function renderDisplayButtons(icons) {
+    commandRows.forEach(function (row) {
+        row.orientation = icons ? "row" : "column";
+        row.alignChildren = icons ? ["left", "center"] : ["fill", "top"];
+    });
+    displayButtons.forEach(function (entry) {
+        entry.button.text = icons ? "" : entry.label;
+        entry.button.preferredSize = icons ? [30, 30] : [-1, -1];
+        entry.button.onDraw = icons ? entry.draw : null;
+        if (icons) entry.button.notify("onDraw");
+    });
 }

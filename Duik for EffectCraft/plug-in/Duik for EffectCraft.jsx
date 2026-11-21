@@ -14,16 +14,78 @@
             ["fill", [[12, 7], [17, 12], [12, 17], [7, 12]]]],
         Automation: [["line", [[2, 12], [4, 7], [6, 5], [8, 7], [10, 12], [12, 17], [14, 19], [16, 17], [18, 12], [20, 7], [22, 5]]]],
         Layers: [["poly", [[12, 3], [22, 8], [12, 13], [2, 8]]], ["line", [[2, 12], [12, 17], [22, 12]]], ["line", [[2, 16], [12, 21], [22, 16]]]],
-        Camera: [["poly", [[2, 7], [15, 7], [15, 18], [2, 18]]], ["poly", [[15, 11], [22, 7], [22, 18], [15, 14]]], ["dot", 6, 4, 2]]
+        Camera: [["poly", [[2, 7], [15, 7], [15, 18], [2, 18]]], ["poly", [[15, 11], [22, 7], [22, 18], [15, 14]]], ["dot", 6, 4, 2]],
+        Settings: [["dot", 12, 12, 3], ["poly", [[10,2],[14,2],[15,5],[18,6],[21,5],[23,9],[21,12],[23,15],[21,19],[18,18],[15,19],[14,22],[10,22],[9,19],[6,18],[3,19],[1,15],[3,12],[1,9],[3,5],[6,6],[9,5]]]]
     };
 
-    // Adds a toggle-like icon button; `isActive` decides the highlighted look.
-    function addIconButton(parent, key, name, isActive) {
-        var button = parent.add("button", undefined, "", { name: name });
-        button.preferredSize = [30, 30];
-        button.helpTip = key;
-        button.onDraw = function () {
-            var g = this.graphics, w = this.size[0], h = this.size[1], on = isActive(this);
+    // Command pictograms keyed by stable widget ID. Each string describes one or more pen strokes.
+    var commandIcons = {
+        displayMode: "3,5 21,5|12,5 12,20|8,20 16,20|3,5 3,9|21,5 21,9",
+        buildIk: "3,19 10,7 21,16|18,16 21,13 24,16 21,19 18,16",
+        buildIkFk: "2,17 8,6 16,12|12,20 22,20|19,17 22,20 19,23",
+        matchIkFk: "3,7 21,7 17,3|21,17 3,17 7,21",
+        mirrorIk: "12,2 12,22|2,17 8,5 8,17 2,17|22,17 16,5 16,17 22,17",
+        buildOneIkFk: "3,19 18,5|14,5 18,5 18,9|3,15 7,19 3,23 0,19 3,15",
+        buildThreeIk: "2,19 7,7 13,15 21,8|18,8 21,5 24,8 21,11 18,8",
+        buildBezierIk: "2,18 6,9 11,5 16,6 22,13|5,7 11,5 17,3|19,13 22,10 24,13 22,16 19,13",
+        buildBezierFk: "2,18 6,9 11,5 16,6 22,13|2,18 11,18 11,14|5,7 11,5 17,3",
+        buildLimbTemplate: "3,3 15,3 15,21 3,21 3,3|6,8 12,8|6,12 12,12|18,15 18,22|15,18 22,18",
+        buildRigMaster: "12,4 12,10 5,16|12,10 19,16|8,2 16,2 16,7 8,7 8,2|2,16 8,16 8,21 2,21 2,16|16,16 22,16 22,21 16,21 16,16",
+        buildFk: "3,20 7,10 17,5 13,15 3,20|19,15 19,23|15,19 23,19",
+        buildOverlapFk: "2,18 6,8 11,16 17,6|6,22 10,12 15,20 21,10",
+        bindArt: "2,15 10,7 14,7 17,10 17,14 9,22|8,12 16,4 20,4 23,7 23,11 15,19",
+        aim: "2,21 14,9|10,9 14,9 14,13|16,4 21,4 21,9|18,2 18,11|14,7 23,7",
+        follow: "3,15 10,15|7,12 10,15 7,18|14,5 22,5 22,13 14,13 14,5",
+        parentWeight: "3,6 21,6|12,6 12,12|8,13 16,13 19,21 5,21 8,13",
+        followPath: "2,19 7,8 12,6 17,12 22,6|13,19 21,19 18,16|21,19 18,22",
+        setDriver: "3,3 3,21|3,16 9,11 15,14 22,7|17,7 22,7 22,12",
+        connectKeys: "2,12 6,8 10,12 6,16 2,12|10,12 14,12|14,12 18,8 22,12 18,16 14,12",
+        effector: "12,2 19,5 22,12 19,19 12,22 5,19 2,12 5,5 12,2|8,12 12,8 16,12 12,16 8,12",
+        lockProperty: "4,11 20,11 20,21 4,21 4,11|8,11 8,7 10,4 14,4 16,7 16,11|12,15 12,18",
+        resetTransform: "6,7 11,4 17,5 21,10 20,16 16,20 9,20 4,16|6,2 6,7 11,7|12,9 12,15 15,15",
+        alignLayers: "2,4 22,4|6,8 11,8 11,20 6,20 6,8|15,8 20,8 20,15 15,15 15,8",
+        pinPath: "3,17 8,8 17,7 21,16|5,8 8,5 11,8 8,11 5,8|14,7 17,4 20,7 17,10 14,7",
+        keyLinear: "3,20 21,4",
+        keyEaseIn: "3,20 8,13 13,8 17,6 21,6",
+        keyEaseOut: "3,19 8,19 12,17 16,13 21,4",
+        keyEasyEase: "3,19 7,19 10,17 14,7 17,5 21,5",
+        keyHold: "3,18 15,18 15,6 21,6",
+        keySmooth: "3,17 6,12 10,10 14,14 18,12 21,7",
+        spatialLinear: "3,17 8,12 13,7 21,7|1,17 5,17|11,5 11,9|19,7 23,7",
+        keyRove: "8,12 12,8 16,12 12,16 8,12|2,12 5,9|2,12 5,15|22,12 19,9|22,12 19,15",
+        tween: "3,7 3,17|21,7 21,17|8,12 12,8 16,12 12,16 8,12",
+        freezePose: "12,2 12,22|3,7 21,17|3,17 21,7|8,4 12,8 16,4|8,20 12,16 16,20",
+        snapKeys: "4,5 4,13 7,18 12,20 17,18 20,13 20,5|4,10 8,10|16,10 20,10",
+        syncKeys: "12,3 12,21|2,8 9,8 6,5|22,16 15,16 18,13",
+        cleanKeys: "4,17 13,17 19,7 13,4 4,14 4,17|8,10 15,14|5,21 21,21",
+        sequenceLayers: "2,5 11,5|6,12 15,12|11,19 22,19",
+        exposure: "3,4 21,4 21,20 3,20 3,4|9,8 9,16|15,8 15,16",
+        copyAnim: "5,15 2,15 2,3 14,3 14,6|8,8 21,8 21,21 8,21 8,8|11,15 15,11 19,15 15,19 11,15",
+        pasteAnim: "7,5 4,5 4,22 20,22 20,5 17,5|8,3 16,3 16,7 8,7 8,3|8,15 12,11 16,15 12,19 8,15",
+        wiggle: "2,12 5,7 8,16 11,4 15,20 18,8 22,12",
+        random: "3,3 21,3 21,21 3,21 3,3|7,7 8,7|16,7 17,7|11,12 13,12|7,17 8,17|16,17 17,17",
+        swink: "4,5 20,5|12,5 17,16 15,19 12,16|5,14 6,18 10,21 16,21 21,17",
+        spring: "3,3 7,6 16,8 7,10 16,12 7,14 16,16 7,18 12,21",
+        cycleLoop: "7,5 16,5 20,8 20,11|17,8 20,11 23,8|17,19 8,19 4,16 4,13|1,16 4,13 7,16",
+        rollWheel: "12,4 17,6 20,12 17,18 12,20 7,18 4,12 7,6 12,4|12,4 12,20|4,12 20,12",
+        motionTrail: "2,19 4,18|7,16 9,14|12,12 14,10|16,7 19,4 22,7 19,10 16,7",
+        moveAway: "3,21 10,14|3,17 3,21 7,21|14,10 21,3|17,3 21,3 21,7",
+        bakeExpressions: "4,11 20,11 17,20 7,20 4,11|7,8 10,5 14,5 17,8|10,14 14,14",
+        toggleExpressions: "12,2 12,12|7,5 3,9 3,15 7,20 17,20 21,15 21,9 17,5",
+        removeExpressions: "3,6 21,6|8,6 8,3 16,3 16,6|6,6 7,21 17,21 18,6|10,10 10,17|14,10 14,17",
+        addControls: "3,5 15,5 15,17 3,17 3,5|6,11 12,11|9,8 9,14|19,15 19,23|15,19 23,19",
+        addZeros: "4,4 20,4 20,20 4,20 4,4|10,8 14,8 15,10 15,14 14,16 10,16 9,14 9,10 10,8",
+        addSolid: "3,6 17,6 17,19 3,19 3,6|18,3 22,3|20,1 20,5",
+        addAdjustment: "3,5 21,5 21,19 3,19 3,5|4,18 20,6|8,18 20,10|12,18 20,14",
+        renameLayers: "3,6 17,6 22,12 17,18 3,18 3,6|7,14 10,8 13,14|8,12 12,12|16,12 18,12",
+        loadNotes: "5,3 15,3 20,8 20,21 5,21 5,3|15,3 15,8 20,8|12,17 12,10 9,13|12,10 15,13",
+        saveNotes: "5,3 15,3 20,8 20,21 5,21 5,3|15,3 15,8 20,8|12,10 12,17 9,14|12,17 15,14",
+        camera2d: "2,6 15,6 15,17 2,17 2,6|15,9 22,5 22,18 15,14|6,20 15,20",
+        rigCamera: "12,2 22,7 22,17 12,22 2,17 2,7 12,2|2,7 12,12 22,7|12,12 12,22"
+    };
+
+    function drawButtonIcon(button, shapes, on) {
+            var g = button.graphics, w = button.size[0], h = button.size[1];
             var ink = on ? [1, 1, 1, 1] : [0.78, 0.78, 0.78, 1];
             var pen = g.newPen(g.PenType.SOLID_COLOR, ink, 1.6), brush = g.newBrush(g.BrushType.SOLID_COLOR, ink);
             g.newPath();
@@ -36,7 +98,7 @@
                 for (var i = 1; i < points.length; i++) g.lineTo(points[i][0] + dx, points[i][1] + dy);
                 if (close) g.closePath();
             }
-            sectionIcons[key].forEach(function (shape) {
+            shapes.forEach(function (shape) {
                 if (shape[0] === "dot") {
                     g.newPath();
                     g.ellipsePath(shape[1] - shape[3] + dx, shape[2] - shape[3] + dy, shape[3] * 2, shape[3] * 2);
@@ -44,8 +106,48 @@
                 } else if (shape[0] === "fill") { path(shape[1], true); g.fillPath(brush); }
                 else { path(shape[1], shape[0] === "poly"); g.strokePath(pen); }
             });
-        };
+    }
+
+    // Change presentation on existing widgets; handlers, inputs, and the current page stay intact.
+    var displayButtons = [];
+    var commandRows = [];
+
+    // Keep each command on the same widget: only the group's flow changes.
+    function addCommandRow(parent) {
+        var group = parent.add("group");
+        group.alignment = ["fill", "top"];
+        group.spacing = 4;
+        commandRows.push(group);
+        return group;
+    }
+
+    function addDisplayButton(parent, label, name, isActive) {
+        var shapes = sectionIcons[label];
+        if (!shapes) {
+            if (!commandIcons[name]) throw new Error("Missing Duik icon: " + name);
+            shapes = commandIcons[name].split("|").map(function (stroke) {
+                return ["line", stroke.split(" ").map(function (point) { return point.split(",").map(Number); })];
+            });
+        }
+        var button = parent.add("button", undefined, label, { name: name });
+        button.helpTip = label;
+        displayButtons.push({ button: button, label: label, draw: function () {
+            drawButtonIcon(this, shapes, isActive ? isActive() : false);
+        }});
         return button;
+    }
+
+    function renderDisplayButtons(icons) {
+        commandRows.forEach(function (row) {
+            row.orientation = icons ? "row" : "column";
+            row.alignChildren = icons ? ["left", "center"] : ["fill", "top"];
+        });
+        displayButtons.forEach(function (entry) {
+            entry.button.text = icons ? "" : entry.label;
+            entry.button.preferredSize = icons ? [30, 30] : [-1, -1];
+            entry.button.onDraw = icons ? entry.draw : null;
+            if (icons) entry.button.notify("onDraw");
+        });
     }
     // Rigging.jsxinc
     function buildRiggingTab(panel) {
@@ -54,27 +156,32 @@
         panel.add("statictext", undefined, "Select three 2D layers in timeline order:");
         panel.add("statictext", undefined, "upper limb, lower limb, target null.");
         panel.add("statictext", undefined, "For one bone: select one limb above its target null.");
-        var build = panel.add("button", undefined, "Build Two-Bone IK", { name: "buildIk" });
-        var buildSwitchable = panel.add("button", undefined, "Build Two-Bone IK/FK", { name: "buildIkFk" });
-        var match = panel.add("button", undefined, "Match Pose and Switch IK/FK", { name: "matchIkFk" });
-        var buildOne = panel.add("button", undefined, "Build One-Bone IK/FK", { name: "buildOneIkFk" });
-        var buildThree = panel.add("button", undefined, "Build Three-Bone IK", { name: "buildThreeIk" });
-        buildThree.helpTip = "Select three limbs from root to tip, above their target null.";
-        var buildBezier = panel.add("button", undefined, "Build Bézier IK", { name: "buildBezierIk" });
-        buildBezier.helpTip = "Select 2–16 limbs, then start handle, end handle, and tip nulls in timeline order.";
-        var buildBezierFk = panel.add("button", undefined, "Build Bézier FK", { name: "buildBezierFk" });
-        buildBezierFk.helpTip = "Select 2–16 limbs, then root, start handle, end handle, and tip nulls in timeline order.";
+        var twoBone = addCommandRow(panel);
+        var build = addDisplayButton(twoBone, "Build Two-Bone IK", "buildIk");
+        var buildSwitchable = addDisplayButton(twoBone, "Build Two-Bone IK/FK", "buildIkFk");
+        var match = addDisplayButton(twoBone, "Match Pose and Switch IK/FK", "matchIkFk");
+        var mirror = addDisplayButton(twoBone, "Mirror IK", "mirrorIk");
+        mirror.helpTip += ": Select one two-bone target null. Flip the elbow or knee without moving the target.";
+        var chains = addCommandRow(panel);
+        var buildOne = addDisplayButton(chains, "Build One-Bone IK/FK", "buildOneIkFk");
+        var buildThree = addDisplayButton(chains, "Build Three-Bone IK", "buildThreeIk");
+        buildThree.helpTip += ": Select three limbs from root to tip, above their target null.";
+        var buildBezier = addDisplayButton(chains, "Build Bézier IK", "buildBezierIk");
+        buildBezier.helpTip += ": Select 2–16 limbs, then start handle, end handle, and tip nulls in timeline order.";
+        var buildBezierFk = addDisplayButton(chains, "Build Bézier FK", "buildBezierFk");
+        buildBezierFk.helpTip += ": Select 2–16 limbs, then root, start handle, end handle, and tip nulls in timeline order.";
         var templates = panel.add("group");
         var template = templates.add("dropdownlist", undefined, ["Arm", "Leg", "Spine", "Tail", "Hair"], { name: "limbTemplate" });
         template.selection = 0;
-        var buildTemplate = templates.add("button", undefined, "Create Template", { name: "buildLimbTemplate" });
-        var buildMaster = panel.add("button", undefined, "Group IK/FK Rigs Under Master", { name: "buildRigMaster" });
-        buildMaster.helpTip = "Select the target nulls of unparented two-bone IK/FK rigs.";
+        var buildTemplate = addDisplayButton(templates, "Create Template", "buildLimbTemplate");
+        var buildMaster = addDisplayButton(addCommandRow(panel), "Group IK/FK Rigs Under Master", "buildRigMaster");
+        buildMaster.helpTip += ": Select the target nulls of unparented two-bone IK/FK rigs.";
         var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
         status.preferredSize = [300, 64];
 
         function magnitude(x, y) { return Math.sqrt(x * x + y * y); }
         var rigTag = "// EC-Duik-IKFK-v1 ";
+        var ikTag = "// EC-Duik-IK-v1 ";
 
         function requirePlain(property, label) {
             if (!property || property.numKeys || property.expression) {
@@ -306,6 +413,16 @@
             return installRig(forward ? "Build Bézier FK" : "Build Bézier IK", forward ? root : target, [], driven, expressions);
         }
 
+        // Keep the deformed bone exactly on its solved segment, even for artwork drawn off-axis.
+        // Returns local scale multipliers and the rotation correction for the chosen bone axis.
+        function limbShape(ratio, offset) {
+            var x = Math.cos(offset), y = -Math.sin(offset);
+            var sx = Math.abs(x) >= Math.abs(y) ? ratio : 1/ratio;
+            var sy = sx === ratio ? 1/ratio : ratio;
+            var n = ratio / Math.sqrt(x*x*sx*sx + y*y*sy*sy);
+            return [sx*n, sy*n, Math.atan2(y*x*(sx-sy), x*x*sx+y*y*sy) * 180/Math.PI];
+        }
+
         function makeRig(comp, switchable, templateLayers) {
             var layers = templateLayers || selectedLimb(comp), upper = layers[0], lower = layers[1], target = layers[2];
             var root = upper.transform.position;
@@ -315,10 +432,8 @@
             requirePlain(elbow, "Lower Position");
             requirePlain(upperRotation, "Upper Rotation");
             requirePlain(lowerRotation, "Lower Rotation");
-            if (switchable) {
-                requirePlain(upper.transform.scale, "Upper Scale");
-                requirePlain(lower.transform.scale, "Lower Scale");
-            }
+            requirePlain(upper.transform.scale, "Upper Scale");
+            requirePlain(lower.transform.scale, "Lower Scale");
             if (root.expression || target.transform.position.expression) {
                 throw new Error("Remove existing root/target Position expressions to avoid cycles.");
             }
@@ -340,31 +455,35 @@
                 "var x = c[0] - a[0], y = c[1] - a[1];\n" +
                 "var d = Math.sqrt(x*x + y*y);\n" +
                 "var h = d > 0.000001 ? Math.atan2(y,x) : " + Math.atan2(dy, dx) + ";\n" +
-                "var l1 = " + l1 + ", l2 = " + l2 + ";\n";
-            if (switchable) source += "var driver = " + targetRef + ";\n" +
-                'var fk = driver.effect("Use FK")(1) > 0;\n' +
-                'var stretch = !fk && driver.effect("Stretch IK")(1) > 0 ? Math.max(1, d/(l1+l2)) : 1;\n' +
-                "l1 *= stretch; l2 *= stretch;\n";
+                "var l1 = " + l1 + ", l2 = " + l2 + ";\n" +
+                "var driver = " + targetRef + ";\n" +
+                "var fk = " + (switchable ? 'driver.effect("Use FK")(1) > 0' : "false") + ";\n" +
+                'var ratio = fk ? 1 : 1 + Math.max(-75, Math.min(100, driver.effect("Squash & Stretch")(1)*1))/100;\n' +
+                'var stretch = !fk && driver.effect("Stretch IK")(1) > 0 ? Math.max(1, d/((l1+l2)*ratio)) : 1;\n' +
+                "l1 *= ratio*stretch; l2 *= ratio*stretch;\n" + limbShape.toString() + "\n";
             var scaleSource = source;
             source +=
                 "var r = Math.max(Math.abs(l1-l2), Math.min(l1+l2, d));\n" +
                 "var k = r > 0.000001 ? (l1*l1+r*r-l2*l2)/(2*l1*r) : 0;\n" +
-                (switchable ? 'var bend = driver.effect("Flip IK Bend")(1) > 0 ? -1 : 1;\n' : "") +
-                "var ang = h + " + (switchable ? "bend * " : "") + "(" + side + ") * Math.acos(Math.max(-1,Math.min(1,k)));\n" +
+                'var bend = driver.effect("Flip IK Bend")(1) > 0 ? -1 : 1;\n' +
+                "var ang = h + bend * (" + side + ") * Math.acos(Math.max(-1,Math.min(1,k)));\n" +
                 "var ex = Math.cos(ang)*l1, ey = Math.sin(ang)*l1;\n";
             var driven = [upperRotation, elbow, lowerRotation];
-            var upperAngle = "ang * 180 / Math.PI + (" + upperOffset + ")";
-            var lowerAngle = "Math.atan2(Math.sin(h)*r-ey, Math.cos(h)*r-ex) * 180 / Math.PI + (" + lowerOffset + ")";
+            var upperShape = "limbShape(ratio," + upperOffset * Math.PI / 180 + ")";
+            var lowerShape = "limbShape(ratio," + lowerOffset * Math.PI / 180 + ")";
+            var upperAngle = "ang * 180 / Math.PI + (" + upperOffset + ") + " + upperShape + "[2]";
+            var lowerAngle = "Math.atan2(Math.sin(h)*r-ey, Math.cos(h)*r-ex) * 180 / Math.PI + (" + lowerOffset + ") + " + lowerShape + "[2]";
             var controls = [
-                ["Use FK", "ADBE Checkbox Control"],
-                ["FK Shoulder", "ADBE Angle Control"],
-                ["FK Elbow", "ADBE Angle Control"],
                 ["Flip IK Bend", "ADBE Checkbox Control"],
-                ["Stretch IK", "ADBE Checkbox Control"]
+                ["Stretch IK", "ADBE Checkbox Control"],
+                ["Squash & Stretch", "ADBE Slider Control"]
             ];
+            var names = layers.map(function (layer) { return layer.name; });
             if (switchable) {
-                var metadata = { layers: layers.map(function (layer) { return layer.name; }), restUpper: upperRotation.value,
-                    restLower: lowerRotation.value, lowerOffset: lowerOffset, l2: l2, side: side, stretchReach: l1 + l2 };
+                controls = [["Use FK", "ADBE Checkbox Control"], ["FK Shoulder", "ADBE Angle Control"],
+                    ["FK Elbow", "ADBE Angle Control"]].concat(controls);
+                var metadata = { layers: names, restUpper: upperRotation.value,
+                    restLower: lowerRotation.value, lowerOffset: lowerOffset, l2: l2, side: side, stretchReach: l1 + l2, squashStretch: true };
                 source = rigTag + JSON.stringify(metadata) + "\n" + source;
                 source += 'var shoulder = driver.effect("FK Shoulder")(1) * 1;\n' +
                     'var elbow = driver.effect("FK Elbow")(1) * 1;\n' +
@@ -374,16 +493,15 @@
                     "}\n";
                 upperAngle = "fk ? (" + upperRotation.value + ") + shoulder : " + upperAngle;
                 lowerAngle = "fk ? (" + lowerRotation.value + ") + shoulder + elbow : " + lowerAngle;
-            }
+            } else source = ikTag + JSON.stringify({ layers: names }) + "\n" + source;
             var expressions = [source + upperAngle + ";", source + "[a[0] + ex, a[1] + ey];", source + lowerAngle + ";"];
-            if (switchable) {
-                var scaleExpression = scaleSource + "value.map(function (axis) { return axis * stretch; });";
-                driven.push(upper.transform.scale, lower.transform.scale);
-                expressions.push(scaleExpression, scaleExpression);
-            }
+            driven.push(upper.transform.scale, lower.transform.scale);
+            [upperShape, lowerShape].forEach(function (shape) {
+                expressions.push(scaleSource + "var s = " + shape + "; [value[0]*s[0]*stretch, value[1]*s[1]*stretch];");
+            });
 
             return installRig(switchable ? "Build Two-Bone IK/FK" : "Build Two-Bone IK",
-                target, switchable ? controls : [], driven, expressions, !!templateLayers);
+                target, controls, driven, expressions, !!templateLayers);
         }
 
         function makeLimbTemplate(comp, leg) {
@@ -458,19 +576,65 @@
             }
         }
 
-        function rigSpec(layers) {
+        function rigSpec(layers, tag) {
+            tag = tag || rigTag;
             var upper = layers[0], lower = layers[1];
             var ur = upper.transform.rotation, lr = lower.transform.rotation;
             var elbow = lower.transform.position;
             var header = (ur.expression || "").split("\n")[0];
-            if (header.indexOf(rigTag) !== 0 || ![ur, lr, elbow].every(function (p) {
+            if (header.indexOf(tag) !== 0 || ![ur, lr, elbow].every(function (p) {
                 return (p.expression || "").split("\n")[0] === header && p.expressionEnabled && !p.expressionError;
-            })) throw new Error("Select a working two-bone IK/FK rig built with this version.");
-            var spec = JSON.parse(header.slice(rigTag.length));
+            })) throw new Error("Select a working two-bone rig built with this version.");
+            var spec = JSON.parse(header.slice(tag.length));
             if (JSON.stringify(spec.layers) !== JSON.stringify(layers.map(function (layer) { return layer.name; }))) {
                 throw new Error("Select the original upper, lower, and target layers.");
             }
             return spec;
+        }
+
+        function rigForTarget(comp, target, allowIk) {
+            var found = [];
+            for (var i = 1; i <= comp.numLayers; i++) {
+                var layer = comp.layer(i);
+                if (!(layer instanceof AVLayer)) continue;
+                var header = (layer.transform.rotation.expression || "").split("\n")[0];
+                var tag = allowIk && header.indexOf(ikTag) === 0 ? ikTag : rigTag;
+                if (header.indexOf(tag) !== 0) continue;
+                var spec = JSON.parse(header.slice(tag.length));
+                if (spec.layers[0] === layer.name && spec.layers[2] === target.name) found.push({ names: spec.layers, tag: tag });
+            }
+            if (found.length !== 1) throw new Error("No unique two-bone rig for " + target.name + ".");
+            var match = found[0], layers = match.names.map(function (name) { return comp.layer(name); });
+            if (layers.some(function (layer) { return !layer; }) || layers[2] !== target) throw new Error("Restore the original rig layer names.");
+            return { layers: layers, tag: match.tag };
+        }
+
+        function rigControl(target, name, matchName) {
+            var effect = target.property("ADBE Effect Parade").property(name), property = effect && effect.property(1);
+            if (!property || effect.matchName !== matchName || property.expression) throw new Error("Restore control: " + name);
+            return property;
+        }
+
+        function mirrorIk(comp) {
+            if (!(comp instanceof CompItem) || comp.selectedLayers.length !== 1 || !comp.selectedLayers[0].nullLayer) {
+                throw new Error("Select one two-bone IK target null (wrist or ankle).");
+            }
+            var target = comp.selectedLayers[0], rig = rigForTarget(comp, target, true), parent = target.parent;
+            if (parent && parent.threeDLayer) throw new Error("Use a shared 2D parent.");
+            rig.layers.forEach(function (layer) { requireLayer(comp, layer, parent); });
+            rigSpec(rig.layers, rig.tag);
+            if (rig.tag === rigTag && Number(rigControl(target, "Use FK", "ADBE Checkbox Control").value) > 0) {
+                throw new Error("Switch to IK before mirroring the bend.");
+            }
+            var flip = rigControl(target, "Flip IK Bend", "ADBE Checkbox Control"), next = !(Number(flip.value) > 0);
+            app.beginUndoGroup("Mirror IK");
+            try {
+                if (flip.numKeys) flip.setValueAtTime(comp.time, next);
+                else flip.setValue(next);
+            } finally {
+                app.endUndoGroup();
+            }
+            return "IK bend " + (next ? "mirrored" : "restored") + " on " + target.name + ".";
         }
 
         function groupRigs(comp) {
@@ -478,18 +642,7 @@
             var targets = comp.selectedLayers.slice(), members = [];
             targets.forEach(function (target) {
                 if (!target.nullLayer) throw new Error("Select only the IK/FK target nulls.");
-                var found = [];
-                for (var i = 1; i <= comp.numLayers; i++) {
-                    var layer = comp.layer(i);
-                    if (!(layer instanceof AVLayer)) continue;
-                    var header = (layer.transform.rotation.expression || "").split("\n")[0];
-                    if (header.indexOf(rigTag) !== 0) continue;
-                    var spec = JSON.parse(header.slice(rigTag.length));
-                    if (spec.layers[0] === layer.name && spec.layers[2] === target.name) found.push(spec.layers);
-                }
-                if (found.length !== 1) throw new Error("No unique two-bone IK/FK rig for " + target.name + ".");
-                var layers = found[0].map(function (name) { return comp.layer(name); });
-                if (layers.some(function (layer) { return !layer; }) || layers[2] !== target) throw new Error("Restore the original rig layer names.");
+                var layers = rigForTarget(comp, target, false).layers;
                 layers.forEach(function (layer) {
                     requireLayer(comp, layer);
                     if (members.indexOf(layer) >= 0) throw new Error("Selected rigs share layers.");
@@ -525,14 +678,14 @@
             var ur = upper.transform.rotation, lr = lower.transform.rotation;
             var elbow = lower.transform.position, goal = target.transform.position;
             var spec = rigSpec(layers);
-            var rack = target.property("ADBE Effect Parade");
             function control(name, matchName) {
-                var effect = rack.property(name), property = effect && effect.property(1);
-                if (!property || effect.matchName !== matchName || property.expression) throw new Error("Restore control: " + name);
-                return property;
+                return rigControl(target, name, matchName);
             }
             var mode = control("Use FK", "ADBE Checkbox Control");
             if (goal.expression) throw new Error("Target Position must not have an expression.");
+            if (spec.squashStretch && Math.abs(Number(control("Squash & Stretch", "ADBE Slider Control").value)) > 0.000001) {
+                throw new Error("Set Squash & Stretch to 0 before matching IK/FK.");
+            }
             var fromFk = Number(mode.value) > 0, edits;
             if (fromFk) {
                 var root = upper.transform.position.value, joint = elbow.value;
@@ -591,6 +744,10 @@
         match.onClick = function () {
             try { status.text = matchPose(app.project.activeItem); }
             catch (error) { status.text = "Pose not matched: " + error.message; }
+        };
+        mirror.onClick = function () {
+            try { status.text = mirrorIk(app.project.activeItem); }
+            catch (error) { status.text = "IK not mirrored: " + error.message; }
         };
         buildOne.onClick = function () {
             try { status.text = "One-bone IK/FK ready. Animate Position, Use FK, or FK Rotation on " + makeOneBone(app.project.activeItem) + "."; }
@@ -687,8 +844,9 @@
             }
         }
 
+        var tools = addCommandRow(panel);
         function button(label, id, run) {
-            panel.add("button", undefined, label, { name: id }).onClick = function () {
+            addDisplayButton(tools, label, id).onClick = function () {
                 app.beginUndoGroup(label);
                 try { status.text = run(); }
                 catch (error) { status.text = error.message; }
@@ -888,6 +1046,7 @@
             return "Path constraint ready. Keyframe Path Progress on followers.";
         }
 
+        tools = addCommandRow(panel);
         button("Aim at Driver (Keep Offset)", "aim", function () { return constrain(true); });
         button("Follow Driver Position", "follow", function () { return constrain(false); });
         button("Add Weighted Parent Constraint", "parentWeight", weightedParent);
@@ -922,7 +1081,7 @@
         panel.alignChildren = ["fill", "top"];
         panel.add("statictext", undefined, "Connector: pick a driver, then select keyed properties.");
         var driverRow = panel.add("group");
-        driverRow.add("button", undefined, "Set Driver", { name: "setDriver" }).onClick = function () { run("Set Driver", pickDriver); };
+        addDisplayButton(driverRow, "Set Driver", "setDriver").onClick = function () { run("Set Driver", pickDriver); };
         var driverLabel = driverRow.add("statictext", undefined, "No driver.", { name: "driverLabel" });
         driverLabel.preferredSize = [200, 20];
         var range = panel.add("group");
@@ -982,9 +1141,9 @@
             finally { app.endUndoGroup(); }
         }
         function button(parent, label, name, task) {
-            parent.add("button", undefined, label, { name: name }).onClick = function () { run(label, task); };
+            addDisplayButton(parent, label, name).onClick = function () { run(label, task); };
         }
-        function row() { return panel.add("group"); }
+        function row() { return addCommandRow(panel); }
         function write(edits) {
             var applied = [];
             try {
@@ -1278,18 +1437,14 @@
         }
 
         function button(parent, label, name, run) {
-            parent.add("button", undefined, label, { name: name }).onClick = function () {
+            addDisplayButton(parent, label, name).onClick = function () {
                 app.beginUndoGroup(label);
                 try { status.text = run(comp()); }
                 catch (error) { status.text = error.message; }
                 finally { app.endUndoGroup(); }
             };
         }
-        function row() {
-            var group = panel.add("group");
-            group.alignChildren = ["fill", "center"];
-            return group;
-        }
+        function row() { return addCommandRow(panel); }
 
         function interpolate(label, inType, outType, inInfluence, outInfluence) {
             return function (c) {
@@ -1573,11 +1728,11 @@
         }
 
         function button(parent, label, name, run) {
-            parent.add("button", undefined, label, { name: name }).onClick = function () {
+            addDisplayButton(parent, label, name).onClick = function () {
                 try { status.text = run(); } catch (error) { status.text = error.message; }
             };
         }
-        function row() { return ui.add("group"); }
+        function row() { return addCommandRow(ui); }
 
         // Expressions map each dimension the same way for numbers and arrays.
         var each = "function each(v, f) { return typeof v === 'number' ? f(v, 0) : v.map(f); }\n";
@@ -1769,7 +1924,7 @@
         status.preferredSize = [300, 42];
 
         function button(label, name, run, parent) {
-            (parent || ui).add("button", undefined, label, { name: name }).onClick = function () {
+            addDisplayButton(parent || addCommandRow(ui), label, name).onClick = function () {
                 var comp = app.project.activeItem;
                 if (!(comp instanceof CompItem)) { status.text = "Open a composition first."; return; }
                 app.beginUndoGroup(label);
@@ -1839,9 +1994,9 @@
             return "Created " + placements.length + (parentArt ? " zero control(s)." : " controller(s).");
         }
 
-        button("Add Controllers", "addControls", function (comp) { return addControls(comp, false); });
-        button("Add Zero Parents", "addZeros", function (comp) { return addControls(comp, true); });
-        var native = ui.add("group");
+        var native = addCommandRow(ui);
+        button("Add Controllers", "addControls", function (comp) { return addControls(comp, false); }, native);
+        button("Add Zero Parents", "addZeros", function (comp) { return addControls(comp, true); }, native);
         button("Add Comp-Sized Solid", "addSolid", function (comp) {
             comp.layers.addSolid([1, 1, 1], "Solid", comp.width, comp.height, comp.pixelAspect, comp.duration);
             return "Created comp-sized solid.";
@@ -1908,7 +2063,7 @@
         ui.add("statictext", undefined, "Composition notes (saved in the project):");
         var notes = ui.add("edittext", undefined, "", { name: "compNotes", multiline: true });
         notes.preferredSize = [300, 60];
-        var noteRow = ui.add("group");
+        var noteRow = addCommandRow(ui);
         button("Load Notes", "loadNotes", function (comp) { notes.text = comp.comment || ""; return "Loaded notes for " + comp.name + "."; }, noteRow);
         button("Save Notes", "saveNotes", function (comp) { comp.comment = notes.text; return "Saved notes to " + comp.name + "."; }, noteRow);
     }
@@ -1931,8 +2086,9 @@
             for (var n = 2; c.layer(name); n++) name = base + " " + n;
             return name;
         }
+        var tools = addCommandRow(panel);
         function button(label, name, task) {
-            panel.add("button", undefined, label, { name: name }).onClick = function () {
+            addDisplayButton(tools, label, name).onClick = function () {
                 app.beginUndoGroup(label);
                 try { status.text = task(comp()); }
                 catch (error) { status.text = error.message; }
@@ -2035,23 +2191,55 @@
     var ui = host instanceof Panel ? host : new Window("palette", "Duik for EffectCraft");
     ui.orientation = "column";
     ui.alignChildren = ["fill", "top"];
-    // Icon toolbar instead of text tabs, so the panel stays usable when docked narrow.
-    var header = ui.add("group");
-    header.alignChildren = ["left", "center"];
-    var bar = header.add("group", undefined, undefined, { name: "duikTabs" });
-    bar.spacing = 2;
-    var title = header.add("statictext", undefined, "", { name: "sectionTitle" });
+    // Two rows keep the full tab names readable in a narrow dock.
+    var header = ui.add("group", undefined, undefined, { name: "duikHeader" });
+    header.orientation = "column";
+    header.alignChildren = ["left", "top"];
+    header.spacing = 3;
+    var heading = header.add("group");
+    heading.alignChildren = ["left", "center"];
+    var title = heading.add("statictext", undefined, "", { name: "sectionTitle" });
     title.preferredSize = [110, 20];
+    var toggle = addDisplayButton(heading, "Toggle Icons / Text", "displayMode");
+    var bar = header.add("group", undefined, undefined, { name: "duikTabs" });
+    bar.orientation = "column";
+    bar.alignChildren = ["left", "top"];
+    bar.spacing = 2;
+    var tabRows = [bar.add("group"), bar.add("group")];
+    tabRows.forEach(function (row) { row.spacing = 3; });
     var pages = ui.add("group");
     pages.orientation = "stack";
+    pages.alignment = ["fill", "fill"];
     pages.alignChildren = ["fill", "top"];
 
-    var sections = [], current = null;
+    var sections = [], current = null, picker, settingsStatus;
+    var preferences = "Duik for EffectCraft", modeKey = "DisplayMode", mode = "text";
+    try {
+        if (app.settings.haveSetting(preferences, modeKey) && app.settings.getSetting(preferences, modeKey) === "icons") mode = "icons";
+    } catch (error) { /* Text remains usable if settings are unavailable. */ }
+
+    function applyMode(value, remember) {
+        mode = value;
+        if (remember) {
+            try {
+                app.settings.saveSetting(preferences, modeKey, mode);
+                settingsStatus.text = "Saved.";
+            } catch (error) {
+                settingsStatus.text = "Applied for this panel session only.";
+            }
+        }
+        picker.selection = mode === "icons" ? 0 : 1;
+        toggle.helpTip = (mode === "icons" ? "Switch to Text mode" : "Switch to Icons mode");
+        renderDisplayButtons(mode === "icons");
+        ui.layout.layout(true);
+    }
+    toggle.onClick = function () { applyMode(mode === "icons" ? "text" : "icons", true); };
+
     function show(section) {
         current = section;
         sections.forEach(function (s) { s.page.visible = s === section; });
         title.text = section.label;
-        sections.forEach(function (s) { s.button.notify("onDraw"); });
+        if (mode === "icons") sections.forEach(function (s) { s.button.notify("onDraw"); });
         ui.layout.layout(true);
     }
     function section(label, name, build) {
@@ -2060,7 +2248,7 @@
         page.alignChildren = ["fill", "top"];
         build(page);
         var entry = { label: label, page: page };
-        entry.button = addIconButton(bar, label, name, function () { return current === entry; });
+        entry.button = addDisplayButton(tabRows[Math.floor(sections.length / 4)], label, name, function () { return current === entry; });
         entry.button.onClick = function () { show(entry); };
         sections.push(entry);
     }
@@ -2072,6 +2260,68 @@
     section("Automation", "tabAutomation", buildAutomationTab);
     section("Layers", "tabLayers", buildLayersTab);
     section("Camera", "tabCamera", buildCameraTab);
+    section("Settings", "tabSettings", function (page) {
+        var row = page.add("group");
+        row.add("statictext", undefined, "Button display");
+        picker = row.add("dropdownlist", undefined, ["Icons", "Text"], { name: "displayPicker" });
+        picker.onChange = function () {
+            if (!picker.selection) return;
+            var choice = picker.selection.index === 0 ? "icons" : "text";
+            if (choice !== mode) applyMode(choice, true);
+        };
+        page.add("statictext", undefined, "Icons show names when you hover. Input labels stay visible.", { multiline: true }).preferredSize = [280, 35];
+        settingsStatus = page.add("statictext", undefined, "", { name: "settingsStatus" });
+    });
+
+    function addDocsFooter() {
+        var links = [
+            { label: "Documentation", name: "openDocs", url: "https://www.diginaat.com/tools/effectcraft/duik/", title: "Duik Documentation" },
+            { label: "GitHub", name: "openGitHub", url: "https://github.com/Diginaat/Duik-for-EffectCraft", title: "Duik for EffectCraft on GitHub" }
+        ];
+        var footer = ui.add("group", undefined, undefined, { name: "duikFooter" });
+        footer.orientation = "column";
+        footer.alignChildren = ["fill", "top"];
+        var buttons = footer.add("group");
+        buttons.alignChildren = ["fill", "center"];
+        var docsLink = footer.add("edittext", undefined, links[0].url, { name: "docsLink", readonly: true });
+        docsLink.characters = links[0].url.length;
+        docsLink.visible = false;
+        var docsStatus = footer.add("statictext", undefined, "", { name: "docsStatus" });
+        docsStatus.visible = false;
+        links.forEach(function (link) {
+            var button = buttons.add("button", undefined, link.label, { name: link.name });
+            button.helpTip = link.label + ": " + link.url;
+            button.onClick = function () { open(link); };
+        });
+        function open(link) {
+            docsLink.text = link.url;
+            docsLink.visible = true;
+            docsStatus.visible = true;
+            try {
+                // Open a local redirect using the host's permission-checked File API.
+                // Keep it in the temp folder so the browser can read it asynchronously.
+                var temp = Folder.temp;
+                if (!temp) throw new Error("Temporary folder unavailable.");
+                var launch = new File(temp.fsName + "/duik-link-" + new Date().getTime() + "-" + Math.floor(Math.random() * 1000000) + ".html");
+                if (!launch.open("w")) throw new Error("Could not prepare link.");
+                try {
+                    if (launch.write('<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=' + link.url + '"><title>' + link.title + '</title><a href="' + link.url + '">Open ' + link.title + '</a>') === false) {
+                        throw new Error("Could not write link.");
+                    }
+                } finally {
+                    launch.close();
+                }
+                if (!launch.execute()) throw new Error("Could not open link.");
+                docsStatus.text = "Opening " + link.title + "…";
+            } catch (error) {
+                docsStatus.text = "Copy the link above into your browser.";
+                docsLink.active = true;
+            }
+            ui.layout.layout(true);
+        }
+    }
+    addDocsFooter();
+    applyMode(mode, false);
     show(sections[0]);
     if (ui instanceof Window) ui.show();
 })(this);

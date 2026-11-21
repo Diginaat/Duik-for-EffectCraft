@@ -170,6 +170,7 @@
         <li><a href="#ref-automation">Automation</a></li>
         <li><a href="#ref-layers">Layers</a></li>
         <li><a href="#ref-camera">Camera</a></li>
+        <li><a href="#ref-settings">Settings &amp; links</a></li>
       </ul>
       <p>Help</p>
       <ul>
@@ -212,10 +213,10 @@
             <figure><img src="images/panel-docked.png" width="1920" height="1032" loading="lazy" alt="EffectCraft main window with the Duik for EffectCraft panel docked on the right, highlighted."><figcaption>The panel docked on the right of the Default workspace.</figcaption></figure>
           </li>
         </ol>
-        <div class="check"><p><strong>It worked if</strong> the panel shows a row of seven icons and the word <em>Rigging</em> next to them, with <em>Ready.</em> under the buttons.</p></div>
+        <div class="check"><p><strong>It worked if</strong> the panel shows <em>Rigging</em> and <strong>Toggle Icons / Text</strong> at the top, two rows of tab buttons, <em>Ready.</em> under the commands, and <strong>Documentation</strong> and <strong>GitHub</strong> buttons at the bottom.</p></div>
         <details>
           <summary>Updating to a newer build</summary>
-          <p>EffectCraft won't overwrite a panel that's already installed. Delete <code>%APPDATA%\EffectCraft\Scripts\ScriptUI Panels\Duik for EffectCraft.jsx</code>, restart EffectCraft, then install again. Developers: run <code>Build-Bundle.ps1</code> first after editing files in <code>src\</code>.</p>
+          <p>Download the newest zip from <a href="https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest">GitHub Releases</a>. EffectCraft won't overwrite a panel that's already installed. Delete <code>%APPDATA%\EffectCraft\Scripts\ScriptUI Panels\Duik for EffectCraft.jsx</code>, restart EffectCraft, then install again. Developers: run <code>Build-Bundle.ps1</code> first after editing files in <code>src\</code>.</p>
         </details>
         <details>
           <summary>Do I need a .wasm file, After Effects, or Duik itself?</summary>
@@ -225,8 +226,11 @@
 
       <section id="tour">
         <h2>Panel tour</h2>
-        <p>The panel has seven sections. Switch between them with the icon bar at the top. Hover an icon to see its name; the current section's name also shows beside the icons.</p>
-        <figure class="narrow"><img src="images/icon-bar.png" width="410" height="64" alt="The seven section icons: Rigging, Armature, Constraints, Animation, Automation, Layers, Camera."></figure>
+        <p>Switch between eight tabs at the top. Use <strong>Toggle Icons / Text</strong> above the tabs, or choose <strong>Settings → Button display</strong>. <strong>Icons</strong> groups commands in a compact grid; hover to read their names. <strong>Text</strong> stacks grouped commands in full-width rows with their full names. Input labels and status messages stay visible in both modes. This guide uses Text mode.</p>
+        <div class="pair">
+          <figure><img src="images/tab-rigging.png" width="342" height="568" loading="lazy" alt="Duik panel in Text mode: Rigging title, Toggle Icons / Text button, two rows of tab buttons, full-width command buttons, and Documentation and GitHub buttons at the bottom."><figcaption><strong>Text mode</strong> (default): full command names.</figcaption></figure>
+          <figure><img src="images/display-icons.png" width="342" height="443" loading="lazy" alt="The same panel in Icons mode: tabs and commands drawn as small pictograms in compact rows; Documentation and GitHub stay as text."><figcaption><strong>Icons mode</strong>: compact; hover an icon for its name.</figcaption></figure>
+        </div>
         <ol class="icons">
           <li><a href="#ref-rigging"><strong>Rigging</strong></a>: IK limbs and body-part templates</li>
           <li><a href="#ref-armature"><strong>Armature</strong></a>: bones from artwork, binding, follow</li>
@@ -235,7 +239,9 @@
           <li><a href="#ref-automation"><strong>Automation</strong></a>: wiggle, spring, loop, wheel, bake</li>
           <li><a href="#ref-layers"><strong>Layers</strong></a>: controllers, zero parents, rename</li>
           <li><a href="#ref-camera"><strong>Camera</strong></a>: 2D parallax camera, 3D camera rig</li>
+          <li><a href="#ref-settings"><strong>Settings</strong></a>: Icons or Text button display</li>
         </ol>
+        <p>At the bottom of every tab, <strong>Documentation</strong> opens this guide and <strong>GitHub</strong> opens the <a href="https://github.com/Diginaat/Duik-for-EffectCraft">project page</a>, where you can download updates and report problems.</p>
         <div class="note"><p><strong>Read the status line.</strong> Every section has a message under its buttons. After each click it says what happened, such as <em>Arm ready. Bind artwork to its bones; animate Arm - Wrist.</em>, or what to select instead.</p></div>
       </section>
 
@@ -287,16 +293,21 @@
             <h4>Animate the wrist</h4>
             <p>Select <strong>Arm - Wrist</strong>. Add a <strong>Position</strong> keyframe at frame 0. Go to 1 second and drag the wrist to a new spot; a second key is added. Scrub the timeline.</p>
             <p>The Effect Controls panel <span class="callout-n">1</span> shows the rig's switches. Leave <strong>Use FK</strong> off for now. The wrist's keyframes <span class="callout-n">2</span> drive the whole arm.</p>
-            <figure><img src="images/arm-4-animated.png" width="1920" height="1032" loading="lazy" alt="Arm bent at the elbow following the moved wrist; Effect Controls list Use FK, FK Shoulder, FK Elbow, Flip IK Bend and Stretch IK."><figcaption>At 1 second the elbow bends so the forearm tip meets the wrist target.</figcaption></figure>
+            <figure><img src="images/arm-4-animated.png" width="1920" height="1032" loading="lazy" alt="Arm bent at the elbow following the moved wrist; Effect Controls list Use FK, FK Shoulder, FK Elbow, Flip IK Bend, Stretch IK and Squash &amp; Stretch."><figcaption>At 1 second the elbow bends so the forearm tip meets the wrist target.</figcaption></figure>
+          </li>
+          <li>
+            <h4>Flip the elbow with Mirror IK</h4>
+            <p>Want the elbow on the other side? Select only <strong>Arm - Wrist</strong> and click <strong>Rigging → Mirror IK</strong>. The elbow flips across the shoulder-to-wrist line; the shoulder and wrist stay put. If <strong>Flip IK Bend</strong> already has keyframes, Mirror IK adds a key at the playhead instead.</p>
+            <figure><img src="images/arm-6-mirror.png" width="1240" height="470" loading="lazy" alt="Two views of the arm at the same frame: before, the elbow points down; after Mirror IK, it points up, with the wrist in the same place."><figcaption>Same frame, same wrist position. Status line: <em>IK bend mirrored on Arm - Wrist.</em></figcaption></figure>
           </li>
         </ol>
         <div class="check"><p><strong>It worked if</strong> the elbow bends by itself as you move the wrist, and both art layers follow.</p></div>
         <div class="pair">
-          <figure><img src="images/arm-5-reach.png" width="840" height="530" loading="lazy" alt="Arm fully straight, stopping short of the wrist target."><figcaption><strong>Target out of reach:</strong> the arm straightens and stops. Turn on <strong>Stretch IK</strong> to let it scale instead.</figcaption></figure>
+          <figure><img src="images/arm-5-reach.png" width="920" height="520" loading="lazy" alt="Arm fully straight, stopping short of the wrist target."><figcaption><strong>Target out of reach:</strong> the arm straightens and stops. Turn on <strong>Stretch IK</strong> to let it scale instead.</figcaption></figure>
           <div>
             <h3>Try next</h3>
             <ul>
-              <li><strong>Reverse the bend:</strong> tick <strong>Flip IK Bend</strong> on the wrist.</li>
+              <li><strong>Squash and stretch:</strong> on the wrist, keyframe <strong>Squash &amp; Stretch</strong>. Try −25 for a shorter, thicker arm or +25 for a longer, thinner one.</li>
               <li><strong>Switch to FK without a jump:</strong> at a frame where the arm is within reach, select the three template nulls and click <strong>Rigging → Match Pose and Switch IK/FK</strong>. Then animate <strong>FK Shoulder</strong> and <strong>FK Elbow</strong>.</li>
               <li><strong>Legs:</strong> same steps, choose <strong>Leg</strong>. The nulls are Hip, Knee, and Ankle.</li>
               <li><strong>Your own artwork order:</strong> see <a href="#ref-rigging">Build Two-Bone IK</a> to rig existing limb layers without a template.</li>
@@ -349,7 +360,7 @@
           <li>
             <h4>Drag the Fader</h4>
             <p>Drag Fader along the track. At the left end (X = 640) Ghost is invisible; at the right end (X = 1280) it's fully visible. Past either end, the value stays at that end.</p>
-            <figure class="narrow"><img src="images/connector-2.png" width="840" height="530" loading="lazy" alt="The orange knob three-quarters along the track and the ghost mostly visible."><figcaption>Fader at X = 1120, three-quarters along: Ghost is at 75% opacity.</figcaption></figure>
+            <figure class="narrow"><img src="images/connector-2.png" width="920" height="520" loading="lazy" alt="The orange knob three-quarters along the track and the ghost mostly visible."><figcaption>Fader at X = 1120, three-quarters along: Ghost is at 75% opacity.</figcaption></figure>
           </li>
         </ol>
         <div class="check"><p><strong>Use it for</strong> facial expressions, hand poses, or any keyed motion you want on one dial. A slider effect or angle control works as the driver too.</p></div>
@@ -385,7 +396,7 @@
       <section id="ref-rigging">
         <h2>Rigging</h2>
         <div class="ref">
-          <figure><img src="images/tab-rigging.png" width="480" height="450" loading="lazy" alt="Rigging tab buttons."></figure>
+          <figure><img src="images/tab-rigging.png" width="342" height="568" loading="lazy" alt="Rigging tab buttons."></figure>
           <div>
             <p>For custom rigs, use unlocked, unparented 2D layers. Order them root to tip in the timeline, followed by the nulls each tool asks for. Set pivots and target positions first.</p>
             <div class="table-wrap"><table>
@@ -393,7 +404,8 @@
               <tbody>
                 <tr><td>Create Template</td><td>Nothing. Choose a part in the dropdown.</td><td><strong>Arm/Leg:</strong> wrist or ankle Position (two-bone IK/FK). <strong>Spine</strong> (5 bones), <strong>Tail</strong> (5), <strong>Hair</strong> (4): bone Rotation. Tail and Hair have Delay Frames and Overlap Amount on the root.</td></tr>
                 <tr><td>Build Two-Bone IK</td><td>Upper limb, lower limb, target null. Anchors at shoulder and elbow; target at the tip.</td><td>Target Position. Upper limb Position moves the shoulder. The starting elbow side sets the bend.</td></tr>
-                <tr><td>Build Two-Bone IK/FK</td><td>Same as above.</td><td>IK: target Position. With <strong>Use FK</strong> on: <strong>FK Shoulder</strong> and <strong>FK Elbow</strong>. Also has <strong>Flip IK Bend</strong> and <strong>Stretch IK</strong>.</td></tr>
+                <tr><td>Build Two-Bone IK/FK</td><td>Same as above.</td><td>IK: target Position. With <strong>Use FK</strong> on: <strong>FK Shoulder</strong> and <strong>FK Elbow</strong>.</td></tr>
+                <tr><td>Mirror IK</td><td>Only the wrist or ankle target null of a supported two-bone rig. Leave <strong>Use FK</strong> off.</td><td>Flips the elbow or knee without moving the target. If <strong>Flip IK Bend</strong> already has keys, the button sets a key at the playhead; otherwise it changes the static value.</td></tr>
                 <tr><td>Match Pose and Switch IK/FK</td><td>The rig's three layers, at the switch frame.</td><td>Keys the other mode to match the pose and flips <strong>Use FK</strong>, in one undo step.</td></tr>
                 <tr><td>Build One-Bone IK/FK</td><td>One limb above its target null.</td><td>Target Position aims the limb. <strong>Use FK</strong> + <strong>FK Rotation</strong> for FK. No stretch.</td></tr>
                 <tr><td>Build Three-Bone IK</td><td>Three limbs, then a target at the last tip.</td><td>Target Position. <strong>Lead Angle</strong> biases the first joint; <strong>Flip Tail Bend</strong> reverses the end. IK only.</td></tr>
@@ -402,8 +414,11 @@
                 <tr><td>Group IK/FK Rigs Under Master</td><td>Target nulls of unparented two-bone IK/FK rigs.</td><td>The new <strong>Rig Master</strong> Position or Rotation moves them together. Keys are kept.</td></tr>
               </tbody>
             </table></div>
+            <details open><summary>Squash and stretch on two-bone rigs</summary>
+              <p>Open Effect Controls on the wrist or ankle target. Set or keyframe <strong>Squash &amp; Stretch</strong>: try <strong>−25</strong> for shorter, thicker limbs, <strong>0</strong> for the original shape, or <strong>+25</strong> for longer, thinner limbs. Width compensation works best for artwork aligned with a local axis. Enable <strong>Stretch IK</strong> separately if the limb should stretch automatically to reach a distant target. Both controls only affect IK. Build a new rig if your existing rig lacks the slider.</p>
+            </details>
             <details><summary>Rules for two-bone rigs</summary>
-              <p>Keep layer names unique. Don't rename the upper layer, target, or generated controls unless you fix the expressions; use <a href="#ref-layers">Layers → Rename</a> instead. Lower-limb Position and both Rotations must not be keyed or driven; IK/FK also needs unkeyed Scale on both limbs. Changing artwork, anchors, or base scale later doesn't update limb lengths: rebuild. FK → IK can't match a fully folded pose. Bring a stretched pose back within reach before matching to FK. Rigs built before pose matching existed still work but can't auto-match.</p>
+              <p>Keep layer names unique. Don't rename the upper layer, target, or generated controls unless you fix the expressions; use <a href="#ref-layers">Layers → Rename</a> instead. Lower-limb Position and both Rotations and Scales must not be keyed or driven. Changing artwork, anchors, or base scale later doesn't update limb lengths: rebuild. FK → IK can't match a fully folded pose. To match modes, set <strong>Squash &amp; Stretch</strong> to 0 and bring an auto-stretched target back within reach. Rigs built before pose matching existed still work but can't auto-match.</p>
             </details>
             <details><summary>Bézier rigs in detail</summary>
               <p>Joints are spread by approximate curve length, weighted by the setup segment lengths. Each segment rotates and scales uniformly between its joints; the artwork itself doesn't bend. Driven Position, Rotation, and Scale must be unkeyed at setup. In Bézier FK, the nulls stay independent: root Rotation changes the rig, not the visible positions of the other nulls. Neither has IK/FK switching or Auto-Curve.</p>
@@ -415,7 +430,7 @@
       <section id="ref-armature">
         <h2>Armature</h2>
         <div class="ref">
-          <figure><img src="images/tab-armature.png" width="480" height="450" loading="lazy" alt="Armature tab buttons."></figure>
+          <figure><img src="images/tab-armature.png" width="342" height="421" loading="lazy" alt="Armature tab buttons."></figure>
           <div>
             <div class="table-wrap"><table>
               <thead><tr><th>Button</th><th>Select first</th><th>Result</th></tr></thead>
@@ -437,7 +452,7 @@
       <section id="ref-constraints">
         <h2>Constraints</h2>
         <div class="ref">
-          <figure><img src="images/tab-constraints.png" width="480" height="450" loading="lazy" alt="Constraints tab with Set Driver, From, To, axis, and tool buttons."></figure>
+          <figure><img src="images/tab-constraints.png" width="342" height="452" loading="lazy" alt="Constraints tab with Set Driver, From, To, axis, and tool buttons."></figure>
           <div>
             <div class="table-wrap"><table>
               <thead><tr><th>Button</th><th>Select first</th><th>Result</th></tr></thead>
@@ -458,7 +473,7 @@
       <section id="ref-animation">
         <h2>Animation</h2>
         <div class="ref">
-          <figure><img src="images/tab-animation.png" width="480" height="450" loading="lazy" alt="Animation tab with interpolation buttons, Ease %, Tween % and key tools."></figure>
+          <figure><img src="images/tab-animation.png" width="342" height="729" loading="lazy" alt="Animation tab with interpolation buttons, Ease %, Tween % and key tools."></figure>
           <div>
             <p>Interpolation buttons need selected <strong>keyframes</strong>. Other tools use selected keyed properties, or every animated property of the selected layers if no property is selected.</p>
             <div class="table-wrap"><table>
@@ -484,7 +499,7 @@
       <section id="ref-automation">
         <h2>Automation</h2>
         <div class="ref">
-          <figure><img src="images/tab-automation.png" width="480" height="450" loading="lazy" alt="Automation tab with wiggle, random, swink, spring, loop, wheel, trail and bake controls."></figure>
+          <figure><img src="images/tab-automation.png" width="342" height="639" loading="lazy" alt="Automation tab with wiggle, random, swink, spring, loop, wheel, trail and bake controls."></figure>
           <div>
             <p>Select numeric properties, not property groups. These tools never overwrite an existing expression.</p>
             <div class="table-wrap"><table>
@@ -510,7 +525,7 @@
       <section id="ref-layers">
         <h2>Layers</h2>
         <div class="ref">
-          <figure><img src="images/tab-layers.png" width="480" height="450" loading="lazy" alt="Layers tab with controller shape, add buttons, rename fields and notes box."></figure>
+          <figure><img src="images/tab-layers.png" width="342" height="614" loading="lazy" alt="Layers tab with controller shape, add buttons, rename fields and notes box."></figure>
           <div>
             <div class="table-wrap"><table>
               <thead><tr><th>Button</th><th>What it does</th></tr></thead>
@@ -529,7 +544,7 @@
       <section id="ref-camera">
         <h2>Camera</h2>
         <div class="ref">
-          <figure><img src="images/tab-camera.png" width="480" height="450" loading="lazy" alt="Camera tab with Add 2D Camera and Rig 3D Camera."></figure>
+          <figure><img src="images/tab-camera.png" width="342" height="300" loading="lazy" alt="Camera tab with Add 2D Camera and Rig 3D Camera."></figure>
           <div>
             <div class="table-wrap"><table>
               <thead><tr><th>Button</th><th>Select first</th><th>Result</th></tr></thead>
@@ -538,6 +553,26 @@
                 <tr><td>Rig 3D Camera</td><td>An unparented camera with static Position and Point of Interest, or nothing.</td><td><strong>Camera Root</strong> moves/orbits, <strong>Camera Body</strong> places, <strong>Camera Target</strong> aims.</td></tr>
               </tbody>
             </table></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-settings">
+        <h2>Settings &amp; links</h2>
+        <div class="ref">
+          <figure><img src="images/tab-settings.png" width="342" height="241" loading="lazy" alt="Settings tab with the Button display dropdown, and the Documentation and GitHub buttons at the bottom."></figure>
+          <div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Control</th><th>Where</th><th>Result</th></tr></thead>
+              <tbody>
+                <tr><td>Button display</td><td>Settings tab.</td><td><strong>Icons</strong> or <strong>Text</strong>. Remembered next time; the status shows <em>Saved.</em></td></tr>
+                <tr><td>Toggle Icons / Text</td><td>Top of the panel, every tab.</td><td>Switches display mode and keeps you on the current tab.</td></tr>
+                <tr><td>Documentation</td><td>Bottom of the panel, every tab.</td><td>Opens the online guide in your browser.</td></tr>
+                <tr><td>GitHub</td><td>Bottom of the panel, every tab.</td><td>Opens <a href="https://github.com/Diginaat/Duik-for-EffectCraft">github.com/Diginaat/Duik-for-EffectCraft</a>: releases, source, and issues.</td></tr>
+              </tbody>
+            </table></div>
+            <p>If EffectCraft blocks the browser from opening, the panel shows the link in a text box. Copy it into your browser.</p>
+            <figure class="narrow"><img src="images/panel-footer.png" width="342" height="190" loading="lazy" alt="Bottom of the panel with the Documentation and GitHub buttons highlighted."></figure>
           </div>
         </div>
       </section>
@@ -562,6 +597,8 @@
           <p>Restore the old name or fix the expression references. Use <a href="#ref-layers">Layers → Rename</a> for future renames. Don't rename generated effect controls.</p></details>
         <details><summary>I can pin a shape path but not follow it.</summary>
           <p><strong>Pin Path Vertices</strong> accepts mask or shape paths. <strong>Follow Selected Mask Path</strong> accepts mask paths only.</p></details>
+        <details><summary>Documentation or GitHub doesn't open a browser.</summary>
+          <p>EffectCraft may block scripts from opening files. Copy the link from the text box under the buttons into your browser.</p></details>
         <details><summary>I reinstalled but still get the old panel.</summary>
           <p>EffectCraft won't overwrite an installed panel. Delete the old copy from <code>%APPDATA%\EffectCraft\Scripts\ScriptUI Panels</code>, restart, and install again.</p></details>
       </section>

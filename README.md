@@ -4,7 +4,7 @@
 
 Rigging and animation tools for EffectCraft, based on the workflows of [Duik](https://github.com/RxLaboratory/Duik) for After Effects.
 
-One dockable panel with seven sections: **Rigging**, **Armature**, **Constraints**, **Animation**, **Automation**, **Layers**, and **Camera**. Build IK arms and legs, follow-through tails, controllers, 2D parallax cameras, and expression-driven animation from native EffectCraft layers.
+One dockable panel with seven tool tabs: **Rigging**, **Armature**, **Constraints**, **Animation**, **Automation**, **Layers**, and **Camera**, plus **Settings** to switch between Icons and Text buttons. Build IK arms and legs (with Mirror IK and squash and stretch), follow-through tails, controllers, 2D parallax cameras, and expression-driven animation from native EffectCraft layers. **Documentation** and **GitHub** buttons at the bottom of the panel open the guide and this repository.
 
 ![The Duik for EffectCraft panel docked in EffectCraft](Duik%20for%20EffectCraft/docs/images/panel-docked.png)
 

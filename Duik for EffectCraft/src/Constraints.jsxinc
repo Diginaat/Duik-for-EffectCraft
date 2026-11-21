@@ -3,7 +3,7 @@ function buildConstraintsTab(panel) {
     panel.alignChildren = ["fill", "top"];
     panel.add("statictext", undefined, "Connector: pick a driver, then select keyed properties.");
     var driverRow = panel.add("group");
-    driverRow.add("button", undefined, "Set Driver", { name: "setDriver" }).onClick = function () { run("Set Driver", pickDriver); };
+    addDisplayButton(driverRow, "Set Driver", "setDriver").onClick = function () { run("Set Driver", pickDriver); };
     var driverLabel = driverRow.add("statictext", undefined, "No driver.", { name: "driverLabel" });
     driverLabel.preferredSize = [200, 20];
     var range = panel.add("group");
@@ -63,9 +63,9 @@ function buildConstraintsTab(panel) {
         finally { app.endUndoGroup(); }
     }
     function button(parent, label, name, task) {
-        parent.add("button", undefined, label, { name: name }).onClick = function () { run(label, task); };
+        addDisplayButton(parent, label, name).onClick = function () { run(label, task); };
     }
-    function row() { return panel.add("group"); }
+    function row() { return addCommandRow(panel); }
     function write(edits) {
         var applied = [];
         try {

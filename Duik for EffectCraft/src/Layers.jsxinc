@@ -11,7 +11,7 @@ function buildLayersTab(ui) {
     status.preferredSize = [300, 42];
 
     function button(label, name, run, parent) {
-        (parent || ui).add("button", undefined, label, { name: name }).onClick = function () {
+        addDisplayButton(parent || addCommandRow(ui), label, name).onClick = function () {
             var comp = app.project.activeItem;
             if (!(comp instanceof CompItem)) { status.text = "Open a composition first."; return; }
             app.beginUndoGroup(label);
@@ -81,9 +81,9 @@ function buildLayersTab(ui) {
         return "Created " + placements.length + (parentArt ? " zero control(s)." : " controller(s).");
     }
 
-    button("Add Controllers", "addControls", function (comp) { return addControls(comp, false); });
-    button("Add Zero Parents", "addZeros", function (comp) { return addControls(comp, true); });
-    var native = ui.add("group");
+    var native = addCommandRow(ui);
+    button("Add Controllers", "addControls", function (comp) { return addControls(comp, false); }, native);
+    button("Add Zero Parents", "addZeros", function (comp) { return addControls(comp, true); }, native);
     button("Add Comp-Sized Solid", "addSolid", function (comp) {
         comp.layers.addSolid([1, 1, 1], "Solid", comp.width, comp.height, comp.pixelAspect, comp.duration);
         return "Created comp-sized solid.";
@@ -150,7 +150,7 @@ function buildLayersTab(ui) {
     ui.add("statictext", undefined, "Composition notes (saved in the project):");
     var notes = ui.add("edittext", undefined, "", { name: "compNotes", multiline: true });
     notes.preferredSize = [300, 60];
-    var noteRow = ui.add("group");
+    var noteRow = addCommandRow(ui);
     button("Load Notes", "loadNotes", function (comp) { notes.text = comp.comment || ""; return "Loaded notes for " + comp.name + "."; }, noteRow);
     button("Save Notes", "saveNotes", function (comp) { comp.comment = notes.text; return "Saved notes to " + comp.name + "."; }, noteRow);
 }
