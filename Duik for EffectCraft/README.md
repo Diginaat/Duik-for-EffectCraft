@@ -2,7 +2,7 @@
 
 This EffectCraft plug-in bundle implements selected Duik-style workflows. It uses EffectCraft layers and expressions, not After Effects, Duik's runtime, or `.ffx` presets. It is not a complete Duik port or a converter for existing Duik rigs.
 
-**New to the panel?** Read the [user guide online](https://www.diginaat.com/tools/effectcraft/duik/), or open [docs/index.html](docs/index.html) in your browser. It works offline and includes a screenshot install walkthrough, four step-by-step guides (IK arm, overlapping tail, connector fade, parallax camera), and a tab-by-tab reference.
+**New to the panel?** Read the [user guide online](https://diginaat.github.io/Duik-for-EffectCraft/), or open [docs/index.html](docs/index.html) in your browser. It works offline and includes a screenshot install walkthrough, four step-by-step guides (IK arm, overlapping tail, connector fade, parallax camera), and a tab-by-tab reference.
 
 ## Install
 

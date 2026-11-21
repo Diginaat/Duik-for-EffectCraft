@@ -1,6 +1,6 @@
 # Duik for EffectCraft
 
-**[Download](https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest)** · **[User guide](https://www.diginaat.com/tools/effectcraft/duik/)**
+**[Download](https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest)** · **[User guide](https://diginaat.github.io/Duik-for-EffectCraft/)**
 
 Rigging and animation tools for EffectCraft, based on the workflows of [Duik](https://github.com/RxLaboratory/Duik) for After Effects.
 
@@ -21,7 +21,7 @@ Get the latest zip from **[Releases](https://github.com/Diginaat/Duik-for-Effect
 
 ## Learn
 
-**[Read the user guide online](https://www.diginaat.com/tools/effectcraft/duik/)**, or open [`Duik for EffectCraft/docs/index.html`](Duik%20for%20EffectCraft/docs/index.html) offline. It includes:
+**[Read the user guide online](https://diginaat.github.io/Duik-for-EffectCraft/)**, or open [`Duik for EffectCraft/docs/index.html`](Duik%20for%20EffectCraft/docs/index.html) offline. It includes:
 
 - a screenshot walkthrough of the install,
 - four step-by-step guides: an IK arm, an overlapping tail, a slider-driven fade, and a parallax camera,
