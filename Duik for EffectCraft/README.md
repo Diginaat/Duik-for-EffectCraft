@@ -10,7 +10,7 @@ Download `Duik-for-EffectCraft-<version>.zip` from [GitHub Releases](https://git
 
 Use **Toggle Icons / Text** above the tabs or **Settings → Button display**. **Icons** groups command buttons into compact grid rows; hover to read a command's name. **Text** stacks grouped commands in full-width rows with their full names. Input labels, field values, and status messages remain readable in both modes.
 
-**Documentation** and **GitHub** are text buttons at the bottom of the panel on every tab, even in Icons mode. **Documentation** opens the [online guide](https://www.diginaat.com/tools/effectcraft/duik/); **GitHub** opens the [project repository](https://github.com/Diginaat/Duik-for-EffectCraft) for releases, source, and issues. If EffectCraft blocks scripts from opening files, copy the URL shown in the footer and paste it into your browser.
+**Documentation** and **GitHub** are text buttons at the bottom of the panel on every tab, even in Icons mode. **Documentation** opens the [online guide](https://diginaat.github.io/Duik-for-EffectCraft/); **GitHub** opens the [project repository](https://github.com/Diginaat/Duik-for-EffectCraft) for releases, source, and issues. If EffectCraft blocks scripts from opening files, copy the URL shown in the footer and paste it into your browser.
 
 ## Rigging tab
 

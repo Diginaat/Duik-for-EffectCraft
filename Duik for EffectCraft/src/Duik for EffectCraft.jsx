@@ -97,7 +97,7 @@
 
     function addDocsFooter() {
         var links = [
-            { label: "Documentation", name: "openDocs", url: "https://www.diginaat.com/tools/effectcraft/duik/", title: "Duik Documentation" },
+            { label: "Documentation", name: "openDocs", url: "https://diginaat.github.io/Duik-for-EffectCraft/", title: "Duik Documentation" },
             { label: "GitHub", name: "openGitHub", url: "https://github.com/Diginaat/Duik-for-EffectCraft", title: "Duik for EffectCraft on GitHub" }
         ];
         var footer = ui.add("group", undefined, undefined, { name: "duikFooter" });
