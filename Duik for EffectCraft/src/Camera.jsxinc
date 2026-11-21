@@ -1,0 +1,118 @@
+function buildCameraTab(panel) {
+    panel.orientation = "column";
+    panel.alignChildren = ["fill", "top"];
+    panel.add("statictext", undefined, "2D camera: select unparented 2D layers.");
+    panel.add("statictext", undefined, "3D rig: select a camera, or nothing to add one.");
+    var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
+    status.preferredSize = [300, 42];
+
+    function comp() {
+        var item = app.project.activeItem;
+        if (!(item instanceof CompItem)) throw new Error("Open a composition first.");
+        return item;
+    }
+    function freshName(c, base) {
+        var name = base;
+        for (var n = 2; c.layer(name); n++) name = base + " " + n;
+        return name;
+    }
+    function button(label, name, task) {
+        panel.add("button", undefined, label, { name: name }).onClick = function () {
+            app.beginUndoGroup(label);
+            try { status.text = task(comp()); }
+            catch (error) { status.text = error.message; }
+            finally { app.endUndoGroup(); }
+        };
+    }
+    function slider(layer, name, value) {
+        var effect = layer.property("ADBE Effect Parade").addProperty("ADBE Slider Control");
+        effect.name = name;
+        effect.property(1).setValue(value);
+        return effect;
+    }
+
+    // Layers move, turn, and zoom around the comp center in proportion to their Camera Depth (100 = full, 0 = fixed).
+    button("Add 2D Camera", "camera2d", function (c) {
+        var layers = c.selectedLayers.slice();
+        if (!layers.length) throw new Error("Select the layers the 2D camera should move.");
+        layers.forEach(function (layer) {
+            var t = layer.transform;
+            if (!(layer instanceof AVLayer) || layer.threeDLayer || layer.parent || t.position.dimensionsSeparated) {
+                throw new Error("Use unparented 2D layers with combined Position: " + layer.name);
+            }
+            if ([t.position, t.rotation, t.scale].some(function (p) { return p.expression || !p.canSetExpression; })) {
+                throw new Error("Remove Position, Rotation, and Scale expressions on " + layer.name + ".");
+            }
+            if (layer.property("ADBE Effect Parade").property("Camera Depth")) throw new Error(layer.name + " already follows a 2D camera.");
+        });
+        var center = [c.width / 2, c.height / 2], cam = c.layers.addNull(), added = [], applied = [];
+        try {
+            cam.name = freshName(c, "2D Camera");
+            cam.transform.anchorPoint.setValue([0, 0]);
+            cam.transform.position.setValue(center);
+            slider(cam, "Zoom", 100);
+            var head = "var cam = thisComp.layer(" + JSON.stringify(cam.name) + ");\n" +
+                'var k = effect("Camera Depth")(1)/100, z = 1+(cam.effect("Zoom")(1)/100-1)*k;\n' +
+                "var a = -(cam.transform.rotation)*k*Math.PI/180;\n";
+            var position = head + "var c = [" + center + "], p = cam.transform.position;\n" +
+                "var x = value[0]-c[0]-(p[0]-c[0])*k, y = value[1]-c[1]-(p[1]-c[1])*k;\n" +
+                "[c[0]+z*(x*Math.cos(a)-y*Math.sin(a)), c[1]+z*(x*Math.sin(a)+y*Math.cos(a))];";
+            layers.forEach(function (layer) {
+                added.push(slider(layer, "Camera Depth", 100));
+                var t = layer.transform;
+                [[t.position, position], [t.rotation, head + "value+a*180/Math.PI;"], [t.scale, head + "value.map(function (v) { return v*z; });"]].forEach(function (edit) {
+                    edit[0].expression = edit[1];
+                    applied.push(edit[0]);
+                    if (edit[0].expressionError) throw new Error(edit[0].expressionError);
+                });
+            });
+        } catch (error) {
+            applied.forEach(function (p) { p.expression = ""; });
+            added.forEach(function (e) { e.remove(); });
+            cam.remove();
+            throw error;
+        }
+        return "2D camera ready. Animate " + cam.name + " Position, Rotation, and Zoom; set Camera Depth per layer.";
+    });
+
+    // Root moves or orbits the whole rig; Body places the camera and Target aims it.
+    button("Rig 3D Camera", "rigCamera", function (c) {
+        var selected = c.selectedLayers, camera = null, created = [];
+        if (selected.length > 1 || selected.length === 1 && !(selected[0] instanceof CameraLayer)) throw new Error("Select one camera, or nothing.");
+        if (selected.length) {
+            camera = selected[0];
+            var t = camera.transform;
+            if (camera.parent || [t.position, t.pointOfInterest].some(function (p) { return p.expression || p.numKeys || !p.canSetExpression; })) {
+                throw new Error("Use an unparented camera with static Position and Point of Interest.");
+            }
+        } else {
+            camera = c.layers.addCamera(freshName(c, "Camera"), [c.width / 2, c.height / 2]);
+            created.push(camera);
+        }
+        try {
+            var body = camera.transform.position.value, target = camera.transform.pointOfInterest.value;
+            function rigNull(name, at, parent) {
+                var n = c.layers.addNull();
+                created.push(n);
+                n.name = freshName(c, name);
+                n.threeDLayer = true;
+                n.transform.anchorPoint.setValue([0, 0, 0]);
+                if (parent) n.parent = parent;
+                n.transform.position.setValue(at);
+                return n;
+            }
+            var root = rigNull("Camera Root", [target[0], target[1], 0]);
+            function local(p) { return [p[0] - target[0], p[1] - target[1], p[2]]; }
+            var aim = rigNull("Camera Target", local(target), root);
+            var place = rigNull("Camera Body", local(body), root);
+            camera.transform.position.expression = "thisComp.layer(" + JSON.stringify(place.name) + ").toWorld([0,0,0]);";
+            camera.transform.pointOfInterest.expression = "thisComp.layer(" + JSON.stringify(aim.name) + ").toWorld([0,0,0]);";
+            [camera.transform.position, camera.transform.pointOfInterest].forEach(function (p) { if (p.expressionError) throw new Error(p.expressionError); });
+        } catch (error) {
+            if (!created.length || created[0] !== camera) { camera.transform.position.expression = ""; camera.transform.pointOfInterest.expression = ""; }
+            while (created.length) created.pop().remove();
+            throw error;
+        }
+        return "Camera rig ready. Move or rotate " + root.name + "; animate " + place.name + " and " + aim.name + ".";
+    });
+}

@@ -1,0 +1,315 @@
+function buildAnimationTab(panel) {
+    panel.orientation = "column";
+    panel.alignChildren = ["fill", "top"];
+    panel.add("statictext", undefined, "Select keyframes, properties, or animated layers.");
+    function field(parent, label, initial, name) {
+        parent.add("statictext", undefined, label);
+        var input = parent.add("edittext", undefined, initial, { name: name });
+        input.characters = 4;
+        return input;
+    }
+    var options = panel.add("group");
+    var influence = field(options, "Ease %", "33", "easeInfluence");
+    var ratio = field(options, "Tween %", "50", "tweenRatio");
+    var frames = field(options, "Frames", "2", "animFrames");
+    var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
+    status.preferredSize = [300, 42];
+
+    var LINEAR = KeyframeInterpolationType.LINEAR, BEZIER = KeyframeInterpolationType.BEZIER, HOLD = KeyframeInterpolationType.HOLD;
+    var clipboard = null;
+
+    function comp() {
+        var item = app.project.activeItem;
+        if (!(item instanceof CompItem)) throw new Error("Open a composition first.");
+        return item;
+    }
+    function number(input, label, low, high) {
+        var value = Number(input.text);
+        if (!isFinite(value) || value < low || value > high) throw new Error(label + " must be between " + low + " and " + high + ".");
+        return value;
+    }
+    function keyed(p) { return p instanceof Property && p.canVaryOverTime && p.numKeys > 0; }
+
+    // Every animated property under a layer or property group.
+    function animated(group, list) {
+        list = list || [];
+        for (var i = 1; i <= group.numProperties; i++) {
+            var p = group.property(i);
+            if (p instanceof PropertyGroup) animated(p, list);
+            else if (keyed(p)) list.push(p);
+        }
+        return list;
+    }
+    // Selected keyed properties, or every animated property of the selected layers.
+    function targets(c) {
+        var props = c.selectedProperties.filter(keyed);
+        if (!props.length) c.selectedLayers.forEach(function (layer) { animated(layer, props); });
+        if (!props.length) throw new Error("Select animated properties or layers.");
+        return props;
+    }
+    function selectedKeys(c, fallbackToAll) {
+        var found = [];
+        c.selectedProperties.filter(keyed).forEach(function (p) {
+            var keys = p.selectedKeys.slice();
+            if (keys.length) found.push({ prop: p, keys: keys });
+        });
+        if (!found.length && fallbackToAll) {
+            targets(c).forEach(function (p) {
+                var keys = [];
+                for (var k = 1; k <= p.numKeys; k++) keys.push(k);
+                found.push({ prop: p, keys: keys });
+            });
+        }
+        if (!found.length) throw new Error("Select keyframes first.");
+        return found;
+    }
+
+    function capture(p, i) {
+        var key = { time: p.keyTime(i), value: p.keyValue(i), inType: p.keyInInterpolationType(i), outType: p.keyOutInterpolationType(i),
+            inEase: p.keyInTemporalEase(i), outEase: p.keyOutTemporalEase(i), continuous: p.keyTemporalContinuous(i) };
+        if (p.isSpatial) {
+            key.inTangent = p.keyInSpatialTangent(i);
+            key.outTangent = p.keyOutSpatialTangent(i);
+            key.spatialContinuous = p.keySpatialContinuous(i);
+            key.roving = p.keyRoving(i);
+        }
+        return key;
+    }
+    function restore(p, key, time, value) {
+        var i = p.addKey(time);
+        p.setValueAtKey(i, value === undefined ? key.value : value);
+        p.setTemporalEaseAtKey(i, key.inEase, key.outEase);
+        p.setInterpolationTypeAtKey(i, key.inType, key.outType);
+        p.setTemporalContinuousAtKey(i, key.continuous);
+        if (p.isSpatial && key.inTangent) {
+            p.setSpatialTangentsAtKey(i, key.inTangent, key.outTangent);
+            p.setSpatialContinuousAtKey(i, key.spatialContinuous);
+        }
+        return i;
+    }
+    // Moves keys of one property; times are applied together so keys may cross each other.
+    function moveKeys(p, indices, newTimes) {
+        var keys = indices.map(function (i) { return capture(p, i); });
+        indices.slice().sort(function (a, b) { return b - a; }).forEach(function (i) { p.removeKey(i); });
+        keys.forEach(function (key, j) { restore(p, key, newTimes[j]); });
+    }
+
+    function button(parent, label, name, run) {
+        parent.add("button", undefined, label, { name: name }).onClick = function () {
+            app.beginUndoGroup(label);
+            try { status.text = run(comp()); }
+            catch (error) { status.text = error.message; }
+            finally { app.endUndoGroup(); }
+        };
+    }
+    function row() {
+        var group = panel.add("group");
+        group.alignChildren = ["fill", "center"];
+        return group;
+    }
+
+    function interpolate(label, inType, outType, inInfluence, outInfluence) {
+        return function (c) {
+            var count = 0, influenceValue = number(influence, "Ease", 0.1, 100);
+            selectedKeys(c).forEach(function (set) {
+                set.keys.forEach(function (i) {
+                    var p = set.prop, dims = p.keyInTemporalEase(i).length;
+                    function ease(weight, current) {
+                        var list = [];
+                        for (var d = 0; d < dims; d++) list.push(weight ? new KeyframeEase(0, influenceValue) : current[d]);
+                        return list;
+                    }
+                    if (inType === BEZIER || outType === BEZIER) {
+                        p.setTemporalContinuousAtKey(i, false);
+                        p.setTemporalEaseAtKey(i, ease(inInfluence, p.keyInTemporalEase(i)), ease(outInfluence, p.keyOutTemporalEase(i)));
+                    }
+                    p.setInterpolationTypeAtKey(i, inType, outType);
+                    count++;
+                });
+            });
+            return label + " set on " + count + " key(s).";
+        };
+    }
+
+    var curves = row();
+    button(curves, "Linear", "keyLinear", interpolate("Linear", LINEAR, LINEAR));
+    button(curves, "Ease In", "keyEaseIn", interpolate("Ease In", BEZIER, LINEAR, true, false));
+    button(curves, "Ease Out", "keyEaseOut", interpolate("Ease Out", LINEAR, BEZIER, false, true));
+    var curves2 = row();
+    button(curves2, "Easy Ease", "keyEasyEase", interpolate("Easy Ease", BEZIER, BEZIER, true, true));
+    button(curves2, "Hold", "keyHold", interpolate("Hold", HOLD, HOLD));
+    button(curves2, "Smooth", "keySmooth", function (c) {
+        var count = 0;
+        selectedKeys(c).forEach(function (set) {
+            set.keys.forEach(function (i) {
+                set.prop.setInterpolationTypeAtKey(i, BEZIER, BEZIER);
+                set.prop.setTemporalContinuousAtKey(i, true);
+                set.prop.setTemporalAutoBezierAtKey(i, true);
+                count++;
+            });
+        });
+        return "Smooth set on " + count + " key(s).";
+    });
+    var spatial = row();
+    function spatialKeys(c) {
+        var sets = selectedKeys(c).filter(function (set) { return set.prop.isSpatial; });
+        if (!sets.length) throw new Error("Select keyframes on a spatial property such as Position.");
+        return sets;
+    }
+    button(spatial, "Straight Path", "spatialLinear", function (c) {
+        var count = 0;
+        spatialKeys(c).forEach(function (set) {
+            var zero = set.prop.keyInSpatialTangent(set.keys[0]).map(function () { return 0; });
+            set.keys.forEach(function (i) {
+                set.prop.setSpatialContinuousAtKey(i, false);
+                set.prop.setSpatialTangentsAtKey(i, zero, zero);
+                count++;
+            });
+        });
+        return "Straight motion path on " + count + " key(s).";
+    });
+    button(spatial, "Rove", "keyRove", function (c) {
+        var count = 0;
+        spatialKeys(c).forEach(function (set) {
+            set.keys.forEach(function (i) {
+                if (i > 1 && i < set.prop.numKeys) { set.prop.setRovingAtKey(i, true); count++; }
+            });
+        });
+        if (!count) throw new Error("Roving needs keys between the first and last key.");
+        return "Roving on " + count + " key(s).";
+    });
+
+    var poses = row();
+    button(poses, "Tween", "tween", function (c) {
+        var weight = number(ratio, "Tween", 0, 100) / 100, count = 0, time = c.time;
+        targets(c).forEach(function (p) {
+            var after = 0;
+            for (var k = 1; k <= p.numKeys; k++) if (p.keyTime(k) > time + 1e-6) { after = k; break; }
+            var before = after ? after - 1 : p.numKeys;
+            if (before >= 1 && Math.abs(p.keyTime(before) - time) < 1e-6) before--;
+            if (!after || before < 1) return;
+            var a = p.keyValue(before), b = p.keyValue(after);
+            var value = typeof a === "number" ? a + (b - a) * weight : a.map(function (v, d) { return v + (b[d] - v) * weight; });
+            p.setValueAtTime(time, value);
+            count++;
+        });
+        if (!count) throw new Error("Move between two keyframes first.");
+        return "Tweened " + count + " property(ies).";
+    });
+    button(poses, "Freeze Pose", "freezePose", function (c) {
+        var count = 0, time = c.time;
+        targets(c).forEach(function (p) {
+            var previous = 0;
+            for (var k = 1; k <= p.numKeys; k++) if (p.keyTime(k) < time - 1e-6) previous = k;
+            if (!previous) return;
+            p.setValueAtTime(time, p.keyValue(previous));
+            count++;
+        });
+        if (!count) throw new Error("No keyframe before the current time.");
+        return "Froze " + count + " property(ies) at the previous pose.";
+    });
+    var timing = row();
+    button(timing, "Snap Keys", "snapKeys", function (c) {
+        var step = c.frameDuration, moved = 0;
+        selectedKeys(c, true).forEach(function (set) {
+            var p = set.prop, indices = set.keys.filter(function (i) {
+                var t = p.keyTime(i);
+                return Math.abs(Math.round(t / step) * step - t) > 1e-6;
+            });
+            if (!indices.length) return;
+            moveKeys(p, indices, indices.map(function (i) { return Math.round(p.keyTime(i) / step) * step; }));
+            moved += indices.length;
+        });
+        return "Snapped " + moved + " key(s) to frames.";
+    });
+    button(timing, "Sync Keys", "syncKeys", function (c) {
+        var count = 0;
+        selectedKeys(c).forEach(function (set) {
+            var p = set.prop, first = p.keyTime(set.keys[0]), offset = c.time - first;
+            if (Math.abs(offset) < 1e-9) return;
+            moveKeys(p, set.keys, set.keys.map(function (i) { return p.keyTime(i) + offset; }));
+            count += set.keys.length;
+        });
+        return "Moved " + count + " key(s) to the current time.";
+    });
+    button(timing, "Clean Keys", "cleanKeys", function (c) {
+        var removed = 0;
+        function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+        targets(c).forEach(function (p) {
+            for (var k = p.numKeys - 1; k >= 2; k--) {
+                if (same(p.keyValue(k - 1), p.keyValue(k)) && same(p.keyValue(k), p.keyValue(k + 1))) { p.removeKey(k); removed++; }
+            }
+            if (p.numKeys === 2 && same(p.keyValue(1), p.keyValue(2))) { p.removeKey(2); removed++; }
+        });
+        return "Removed " + removed + " redundant key(s).";
+    });
+    var layers = row();
+    button(layers, "Sequence Layers", "sequenceLayers", function (c) {
+        var list = c.selectedLayers.slice().sort(function (a, b) { return a.index - b.index; });
+        if (list.length < 2) throw new Error("Select two or more layers.");
+        var step = number(frames, "Frames", -10000, 10000) * c.frameDuration, start = list[0].inPoint;
+        list.forEach(function (layer, i) { layer.startTime += start + i * step - layer.inPoint; });
+        return "Sequenced " + list.length + " layers, " + frames.text + " frame(s) apart.";
+    });
+    button(layers, "Exposure", "exposure", function (c) {
+        var hold = Math.round(number(frames, "Frames", 1, 1000));
+        var props = c.selectedProperties.filter(function (p) { return p instanceof Property && p.canSetExpression; });
+        if (!props.length) throw new Error("Select properties to expose on twos or more.");
+        props.forEach(function (p) { if (p.expression) throw new Error("Remove the existing expression on " + p.name + "."); });
+        var applied = [];
+        try {
+            props.forEach(function (p) {
+                p.expression = "// Exposure\nvar step = " + hold + "*thisComp.frameDuration;\nvalueAtTime(inPoint+Math.floor((time-inPoint)/step+1e-6)*step);";
+                applied.push(p);
+                if (p.expressionError) throw new Error(p.expressionError);
+            });
+        } catch (error) {
+            applied.forEach(function (p) { p.expression = ""; });
+            throw error;
+        }
+        return "Holding each pose for " + hold + " frame(s).";
+    });
+
+    // Copy and paste keep values relative to the current time and match properties by matchName path.
+    function path(p) {
+        var parts = [];
+        for (var node = p; node && node.propertyDepth > 0; node = node.parentProperty) {
+            // Effects can repeat a matchName, so address effect instances by name.
+            var effect = node.parentProperty && node.parentProperty.matchName === "ADBE Effect Parade";
+            parts.unshift(effect ? node.name : node.matchName);
+        }
+        return parts;
+    }
+    function resolve(layer, parts) {
+        var node = layer;
+        for (var i = 0; node && i < parts.length; i++) node = node.property(parts[i]);
+        return node instanceof Property ? node : null;
+    }
+    var clip = row();
+    button(clip, "Copy Anim", "copyAnim", function (c) {
+        var props = targets(c), stored = [];
+        props.forEach(function (p) {
+            var keys = p.selectedKeys.slice();
+            if (!keys.length) for (var k = 1; k <= p.numKeys; k++) keys.push(k);
+            stored.push({ path: path(p), keys: keys.map(function (i) { var key = capture(p, i); key.time -= c.time; return key; }) });
+        });
+        clipboard = stored;
+        return "Copied " + stored.length + " property(ies).";
+    });
+    button(clip, "Paste Anim", "pasteAnim", function (c) {
+        if (!clipboard) throw new Error("Copy animation first.");
+        var layersToPaste = c.selectedLayers;
+        if (!layersToPaste.length) throw new Error("Select destination layers.");
+        var count = 0;
+        layersToPaste.forEach(function (layer) {
+            clipboard.forEach(function (item) {
+                var p = resolve(layer, item.path);
+                if (!p || !p.canVaryOverTime) return;
+                item.keys.forEach(function (key) { restore(p, key, c.time + key.time); });
+                count++;
+            });
+        });
+        if (!count) throw new Error("No matching properties on the selected layers.");
+        return "Pasted onto " + count + " property(ies).";
+    });
+}

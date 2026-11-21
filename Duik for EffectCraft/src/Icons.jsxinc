@@ -1,0 +1,45 @@
+// Section icons drawn with ScriptUIGraphics on a 24×24 grid; no image files needed.
+// Each entry is a list of shapes: ["line", points], ["poly", points] (closed), ["dot", x, y, r], ["fill", points].
+var sectionIcons = {
+    Rigging: [["line", [[4, 20], [10, 9], [19, 15]]], ["dot", 4, 20, 2.5], ["dot", 10, 9, 2.5], ["dot", 19, 15, 2.5],
+        ["line", [[19, 9], [19, 21]]], ["line", [[13, 15], [24, 15]]]],
+    Armature: [["poly", [[5, 19], [8, 11], [19, 5], [11, 14]]], ["dot", 5, 19, 2.5], ["dot", 19, 5, 1.5]],
+    Constraints: [["poly", [[2, 12], [5, 8], [11, 8], [14, 12], [11, 16], [5, 16]]],
+        ["poly", [[10, 12], [13, 8], [19, 8], [22, 12], [19, 16], [13, 16]]]],
+    Animation: [["line", [[2, 19], [6, 18], [9, 15], [12, 12], [15, 9], [18, 6], [22, 5]]],
+        ["fill", [[12, 7], [17, 12], [12, 17], [7, 12]]]],
+    Automation: [["line", [[2, 12], [4, 7], [6, 5], [8, 7], [10, 12], [12, 17], [14, 19], [16, 17], [18, 12], [20, 7], [22, 5]]]],
+    Layers: [["poly", [[12, 3], [22, 8], [12, 13], [2, 8]]], ["line", [[2, 12], [12, 17], [22, 12]]], ["line", [[2, 16], [12, 21], [22, 16]]]],
+    Camera: [["poly", [[2, 7], [15, 7], [15, 18], [2, 18]]], ["poly", [[15, 11], [22, 7], [22, 18], [15, 14]]], ["dot", 6, 4, 2]]
+};
+
+// Adds a toggle-like icon button; `isActive` decides the highlighted look.
+function addIconButton(parent, key, name, isActive) {
+    var button = parent.add("button", undefined, "", { name: name });
+    button.preferredSize = [30, 30];
+    button.helpTip = key;
+    button.onDraw = function () {
+        var g = this.graphics, w = this.size[0], h = this.size[1], on = isActive(this);
+        var ink = on ? [1, 1, 1, 1] : [0.78, 0.78, 0.78, 1];
+        var pen = g.newPen(g.PenType.SOLID_COLOR, ink, 1.6), brush = g.newBrush(g.BrushType.SOLID_COLOR, ink);
+        g.newPath();
+        g.rectPath(0, 0, w, h);
+        g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, on ? [0.2, 0.45, 0.85, 1] : [0.16, 0.16, 0.16, 1]));
+        var dx = (w - 24) / 2, dy = (h - 24) / 2;
+        function path(points, close) {
+            g.newPath();
+            g.moveTo(points[0][0] + dx, points[0][1] + dy);
+            for (var i = 1; i < points.length; i++) g.lineTo(points[i][0] + dx, points[i][1] + dy);
+            if (close) g.closePath();
+        }
+        sectionIcons[key].forEach(function (shape) {
+            if (shape[0] === "dot") {
+                g.newPath();
+                g.ellipsePath(shape[1] - shape[3] + dx, shape[2] - shape[3] + dy, shape[3] * 2, shape[3] * 2);
+                g.fillPath(brush);
+            } else if (shape[0] === "fill") { path(shape[1], true); g.fillPath(brush); }
+            else { path(shape[1], shape[0] === "poly"); g.strokePath(pen); }
+        });
+    };
+    return button;
+}

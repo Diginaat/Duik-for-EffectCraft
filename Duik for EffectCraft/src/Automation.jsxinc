@@ -1,0 +1,258 @@
+function buildAutomationTab(ui) {
+    ui.orientation = "column";
+    ui.alignChildren = ["fill", "top"];
+    ui.add("statictext", undefined, "Select animatable properties in the timeline.");
+    function field(parent, label, initial, name) {
+        var row = parent.add("group");
+        row.add("statictext", undefined, label);
+        var input = row.add("edittext", undefined, initial, { name: name });
+        input.characters = 8;
+        return input;
+    }
+    var frequency = field(ui, "Frequency (Hz)", "2", "frequency");
+    var amplitude = field(ui, "Amplitude (property units)", "20", "amplitude");
+    var radius = field(ui, "Wheel radius in comp pixels", "50", "wheelRadius");
+    var curved = ui.add("checkbox", undefined, "Wheel follows curved motion", { name: "wheelCurved" });
+    var status = ui.add("statictext", undefined, "Ready.", { multiline: true });
+    status.preferredSize = [300, 42];
+
+    function positive(input, label) {
+        var number = Number(input.text);
+        if (!(number > 0) || !isFinite(number)) throw new Error(label + " must be a positive number.");
+        return number;
+    }
+    function activeComp() {
+        var comp = app.project.activeItem;
+        if (!(comp instanceof CompItem)) throw new Error("Open a composition first.");
+        return comp;
+    }
+    function selectedProperties() {
+        return activeComp().selectedProperties.filter(function (p) { return p instanceof Property; });
+    }
+    function numeric(p) {
+        var v = p.value;
+        return typeof v === "number" || (Array.isArray(v) && v.every(function (x) { return typeof x === "number"; }));
+    }
+    function layerOf(p) { return p.propertyGroup(p.propertyDepth); }
+
+    // Applies one expression per property; optional controls are added once per layer and shared by its properties.
+    function apply(label, expression, needsKeys, properties, controls) {
+        properties = properties || selectedProperties();
+        if (!properties.length) throw new Error("Select at least one property.");
+        properties.forEach(function (p) {
+            if (!p.canSetExpression || p.expression || !numeric(p)) {
+                throw new Error("Use numeric properties without existing expressions: " + p.name);
+            }
+            if (needsKeys && p.numKeys < 2) throw new Error("Add at least two keys: " + p.name);
+        });
+        app.beginUndoGroup(label);
+        var applied = [], added = [];
+        try {
+            (controls || []).forEach(function (spec) {
+                properties.forEach(function (p) {
+                    var effects = layerOf(p).property("ADBE Effect Parade");
+                    if (effects.property(spec[0])) return;
+                    var effect = effects.addProperty(spec[1]);
+                    added.push(effect);
+                    effect.name = spec[0];
+                    if (spec.length > 2) effect.property(1).setValue(spec[2]);
+                });
+            });
+            properties.forEach(function (p) {
+                p.expression = typeof expression === "function" ? expression(p) : expression;
+                applied.push(p);
+                if (p.expressionError) throw new Error(p.expressionError);
+            });
+        } catch (error) {
+            applied.forEach(function (p) { p.expression = ""; });
+            while (added.length) added.pop().remove();
+            throw error;
+        } finally {
+            app.endUndoGroup();
+        }
+        return label + " applied to " + properties.length + " properties.";
+    }
+
+    function button(parent, label, name, run) {
+        parent.add("button", undefined, label, { name: name }).onClick = function () {
+            try { status.text = run(); } catch (error) { status.text = error.message; }
+        };
+    }
+    function row() { return ui.add("group"); }
+
+    // Expressions map each dimension the same way for numbers and arrays.
+    var each = "function each(v, f) { return typeof v === 'number' ? f(v, 0) : v.map(f); }\n";
+
+    var procedural = row();
+    button(procedural, "Wiggle", "wiggle", function () {
+        return apply("Wiggle", "wiggle(" + positive(frequency, "Frequency") + "," + positive(amplitude, "Amplitude") + ");", false);
+    });
+    button(procedural, "Random", "random", function () {
+        // Holds a new random offset per dimension at each tick.
+        return apply("Random", each + 'var f = Math.max(0.001,effect("Random Frequency")(1)), a = effect("Random Amplitude")(1);\n' +
+            'var step = Math.floor((time-inPoint)*f);\n' +
+            'each(value, function (x, i) { seedRandom(index*1000+step*16+i, true); return x+(random()*2-1)*a; });', false, null,
+            [["Random Frequency", "ADBE Slider Control", positive(frequency, "Frequency")], ["Random Amplitude", "ADBE Slider Control", positive(amplitude, "Amplitude")]]);
+    });
+    button(procedural, "Swink", "swink", function () {
+        // Swing (sine) or Blink (square) around the property value.
+        return apply("Swink", each + 'var f = effect("Swink Frequency")(1), a = effect("Swink Amplitude")(1), ph = effect("Swink Phase")(1);\n' +
+            'var w = Math.sin((time*f+ph/360)*2*Math.PI);\nif (effect("Swink Blink")(1) > 0) w = w >= 0 ? 1 : -1;\n' +
+            'each(value, function (x) { return x+w*a; });', false, null,
+            [["Swink Frequency", "ADBE Slider Control", positive(frequency, "Frequency")], ["Swink Amplitude", "ADBE Slider Control", positive(amplitude, "Amplitude")],
+                ["Swink Phase", "ADBE Angle Control"], ["Swink Blink", "ADBE Checkbox Control"]]);
+    });
+    var timing = row();
+    button(timing, "Cycle Loop", "cycleLoop", function () {
+        return apply("Cycle Loop", 'time < key(1).time ? loopIn("cycle") : loopOut("cycle");', true);
+    });
+    button(timing, "Spring", "spring", function () {
+        // Damped overshoot driven by the velocity entering the most recent key.
+        return apply("Spring", each + 'var amp = effect("Spring Amplitude")(1)/100, f = effect("Spring Frequency")(1), decay = effect("Spring Decay")(1);\n' +
+            'var n = 0;\nif (numKeys > 0) { n = nearestKey(time).index; if (key(n).time > time) n--; }\n' +
+            'if (n > 1 && amp > 0 && f > 0) {\n' +
+            '  var t = time-key(n).time, v = velocityAtTime(key(n).time-thisComp.frameDuration/10), w = f*2*Math.PI;\n' +
+            '  var k = amp*Math.sin(t*w)/Math.exp(decay*t)/w;\n' +
+            '  each(value, function (x, i) { return x+(typeof v === "number" ? v : v[i])*k; });\n} else value;', true, null,
+            [["Spring Amplitude", "ADBE Slider Control", 50], ["Spring Frequency", "ADBE Slider Control", positive(frequency, "Frequency")], ["Spring Decay", "ADBE Slider Control", 5]]);
+    });
+
+    button(timing, "Roll Wheel", "rollWheel", function () {
+        var comp = activeComp(), layers = comp.selectedLayers;
+        if (layers.length !== 1) throw new Error("Select one wheel layer.");
+        var wheel = layers[0], t = wheel.transform;
+        if (!(wheel instanceof AVLayer) || wheel.threeDLayer || wheel.parent || wheel.locked || t.position.dimensionsSeparated || t.position.expression) {
+            throw new Error("Use an unlocked, unparented 2D wheel with combined Position and no Position expression.");
+        }
+        var r = positive(radius, "Wheel radius"), origin = t.position.value[0];
+        if (!curved.value) return apply("Roll Wheel", "value + (transform.position[0]-(" + origin + "))/" + r + "*180/Math.PI;", false, [t.rotation]);
+        // Integrates path length frame by frame from the setup time, signed by horizontal direction.
+        return apply("Roll Wheel", "var p = transform.position, t0 = " + comp.time + ", step = thisComp.frameDuration;\n" +
+            "var dir = time >= t0 ? 1 : -1, d = 0, a = p.valueAtTime(t0), t = t0;\n" +
+            "while ((time-t)*dir > 1e-9) {\n  var next = dir > 0 ? Math.min(time, t+step) : Math.max(time, t-step), b = p.valueAtTime(next);\n" +
+            "  var dx = b[0]-a[0], dy = b[1]-a[1], s = Math.sqrt(dx*dx+dy*dy);\n  d += dx >= 0 ? s : -s;\n  a = b; t = next;\n}\n" +
+            "value + d/" + r + "*180/Math.PI;", false, [t.rotation]);
+    });
+
+    var layerTools = row();
+    function selectedLayers(check) {
+        var layers = activeComp().selectedLayers.slice();
+        if (!layers.length) throw new Error("Select layers first.");
+        layers.forEach(check);
+        return layers;
+    }
+    button(layerTools, "Motion Trail", "motionTrail", function () {
+        var comp = activeComp(), layers = selectedLayers(function (layer) {
+            if (layer.threeDLayer || !layer.name || /[\r\n]/.test(layer.name)) throw new Error("Use 2D layers with single-line names: " + layer.name);
+            for (var i = 1; i <= comp.numLayers; i++) if (i !== layer.index && comp.layer(i).name === layer.name) throw new Error("Layer name must be unique: " + layer.name);
+        });
+        app.beginUndoGroup("Motion Trail");
+        try {
+            layers.forEach(function (layer) {
+                var trail = comp.layers.addShape(), base = "Trail - " + layer.name, name = base;
+                for (var n = 2; comp.layer(name) && comp.layer(name) !== trail; n++) name = base + " " + n;
+                trail.name = name;
+                trail.transform.anchorPoint.setValue([0, 0]);
+                trail.transform.position.setValue([0, 0]);
+                var length = trail.property("ADBE Effect Parade").addProperty("ADBE Slider Control");
+                length.name = "Trail Frames";
+                length.property(1).setValue(12);
+                var items = trail.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").property("ADBE Vectors Group");
+                // Samples the anchor's comp position back in time; capped so long trails stay responsive.
+                items.addProperty("ADBE Vector Shape - Group").property("ADBE Vector Shape").expression =
+                    "var l = thisComp.layer(" + JSON.stringify(layer.name) + "), f = thisComp.frameDuration;\n" +
+                    'var count = Math.max(2, Math.min(240, Math.round(effect("Trail Frames")(1)))), pts = [];\n' +
+                    "for (var i = 0; i < count; i++) { var q = fromComp(l.toComp(l.anchorPoint, time-i*f)); pts.push([q[0],q[1]]); }\n" +
+                    "createPath(pts, [], [], false);";
+                var stroke = items.addProperty("ADBE Vector Graphic - Stroke");
+                stroke.property("ADBE Vector Stroke Color").setValue([0.2, 0.7, 1, 1]);
+                stroke.property("ADBE Vector Stroke Width").setValue(3);
+                trail.moveAfter(layer);
+            });
+        } finally {
+            app.endUndoGroup();
+        }
+        return "Created " + layers.length + " motion trail(s). Adjust Trail Frames on each trail layer.";
+    });
+    button(layerTools, "Move Away", "moveAway", function () {
+        var props = selectedLayers(function (layer) {
+            var p = layer.transform.position;
+            if (!layer.parent || layer.threeDLayer || p.dimensionsSeparated || p.expression) throw new Error("Use parented 2D layers without a Position expression: " + layer.name);
+        }).map(function (layer) { return layer.transform.position; });
+        // Pushes each layer along the line from its parent's anchor point.
+        return apply("Move Away", 'var d = effect("Move Away")(1), o = parent.anchorPoint, x = value[0]-o[0], y = value[1]-o[1], n = Math.sqrt(x*x+y*y);\n' +
+            "n < 1e-6 ? value : [value[0]+x/n*d, value[1]+y/n*d];", false, props, [["Move Away", "ADBE Slider Control", 0]]);
+    });
+
+    var expressions = row();
+    function expressionProperties() {
+        var comp = activeComp(), list = selectedProperties().filter(function (p) { return p.expression; });
+        function walk(group) {
+            for (var i = 1; i <= group.numProperties; i++) {
+                var p = group.property(i);
+                if (p instanceof PropertyGroup) walk(p);
+                else if (p instanceof Property && p.expression) list.push(p);
+            }
+        }
+        if (!list.length) comp.selectedLayers.forEach(walk);
+        if (!list.length) throw new Error("Select properties or layers with expressions.");
+        return list;
+    }
+    function undoable(label, run) {
+        return function () {
+            app.beginUndoGroup(label);
+            try { return run(); } finally { app.endUndoGroup(); }
+        };
+    }
+    button(expressions, "Bake", "bakeExpressions", undoable("Bake Expressions", function () {
+        var comp = activeComp(), props = expressionProperties(), step = comp.frameDuration;
+        // Sample every expression before writing, so expressions that read each other bake consistently.
+        var baked = props.map(function (p) {
+            var layer = layerOf(p), start = Math.max(0, layer.inPoint), end = Math.min(comp.duration, layer.outPoint);
+            var times = [], values = [];
+            for (var f = Math.round(start / step); f * step <= end + 1e-9; f++) {
+                times.push(f * step);
+                values.push(p.valueAtTime(f * step, false));
+            }
+            return { prop: p, times: times, values: values };
+        });
+        function same(a, b, c) {
+            // b lies on the straight line from a to c (keys are evenly spaced).
+            return [].concat(b).every(function (v, i) { return Math.abs(v - ([].concat(a)[i] + [].concat(c)[i]) / 2) < 1e-4; });
+        }
+        var keys = 0;
+        baked.forEach(function (item) {
+            var p = item.prop, times = [], values = [];
+            item.times.forEach(function (time, i) {
+                var v = item.values;
+                if (i > 0 && i < v.length - 1 && same(v[i - 1], v[i], v[i + 1])) return;
+                times.push(time); values.push(v[i]);
+            });
+            p.expression = "";
+            while (p.numKeys) p.removeKey(p.numKeys);
+            if (values.length === 1) p.setValue(values[0]);
+            else {
+                p.setValuesAtTimes(times, values);
+                for (var k = 1; k <= p.numKeys; k++) {
+                    p.setInterpolationTypeAtKey(k, KeyframeInterpolationType.LINEAR, KeyframeInterpolationType.LINEAR);
+                    if (p.isSpatial) {
+                        var zero = p.keyInSpatialTangent(k).map(function () { return 0; });
+                        p.setSpatialTangentsAtKey(k, zero, zero);
+                    }
+                }
+            }
+            keys += p.numKeys;
+        });
+        return "Baked " + baked.length + " expression(s) into " + keys + " key(s).";
+    }));
+    button(expressions, "Toggle", "toggleExpressions", undoable("Toggle Expressions", function () {
+        var props = expressionProperties(), on = !props[0].expressionEnabled;
+        props.forEach(function (p) { p.expressionEnabled = on; });
+        return (on ? "Enabled " : "Disabled ") + props.length + " expression(s).";
+    }));
+    button(expressions, "Remove", "removeExpressions", undoable("Remove Expressions", function () {
+        var props = expressionProperties();
+        props.forEach(function (p) { p.expression = ""; });
+        return "Removed " + props.length + " expression(s).";
+    }));
+}

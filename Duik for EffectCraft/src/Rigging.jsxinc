@@ -1,0 +1,570 @@
+function buildRiggingTab(panel) {
+    panel.orientation = "column";
+    panel.alignChildren = ["fill", "top"];
+    panel.add("statictext", undefined, "Select three 2D layers in timeline order:");
+    panel.add("statictext", undefined, "upper limb, lower limb, target null.");
+    panel.add("statictext", undefined, "For one bone: select one limb above its target null.");
+    var build = panel.add("button", undefined, "Build Two-Bone IK", { name: "buildIk" });
+    var buildSwitchable = panel.add("button", undefined, "Build Two-Bone IK/FK", { name: "buildIkFk" });
+    var match = panel.add("button", undefined, "Match Pose and Switch IK/FK", { name: "matchIkFk" });
+    var buildOne = panel.add("button", undefined, "Build One-Bone IK/FK", { name: "buildOneIkFk" });
+    var buildThree = panel.add("button", undefined, "Build Three-Bone IK", { name: "buildThreeIk" });
+    buildThree.helpTip = "Select three limbs from root to tip, above their target null.";
+    var buildBezier = panel.add("button", undefined, "Build Bézier IK", { name: "buildBezierIk" });
+    buildBezier.helpTip = "Select 2–16 limbs, then start handle, end handle, and tip nulls in timeline order.";
+    var buildBezierFk = panel.add("button", undefined, "Build Bézier FK", { name: "buildBezierFk" });
+    buildBezierFk.helpTip = "Select 2–16 limbs, then root, start handle, end handle, and tip nulls in timeline order.";
+    var templates = panel.add("group");
+    var template = templates.add("dropdownlist", undefined, ["Arm", "Leg", "Spine", "Tail", "Hair"], { name: "limbTemplate" });
+    template.selection = 0;
+    var buildTemplate = templates.add("button", undefined, "Create Template", { name: "buildLimbTemplate" });
+    var buildMaster = panel.add("button", undefined, "Group IK/FK Rigs Under Master", { name: "buildRigMaster" });
+    buildMaster.helpTip = "Select the target nulls of unparented two-bone IK/FK rigs.";
+    var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
+    status.preferredSize = [300, 64];
+
+    function magnitude(x, y) { return Math.sqrt(x * x + y * y); }
+    var rigTag = "// EC-Duik-IKFK-v1 ";
+
+    function requirePlain(property, label) {
+        if (!property || property.numKeys || property.expression) {
+            throw new Error(label + " must have no keyframes or expression.");
+        }
+        if (!property.canSetExpression) throw new Error(label + " does not support expressions.");
+    }
+
+    function requireLayer(comp, layer, sharedParent) {
+        if (!(layer instanceof AVLayer) || layer.threeDLayer || layer.parent !== (sharedParent || null) || layer.locked) {
+            throw new Error("Use unlocked, unparented 2D layers.");
+        }
+        if (!layer.name || layer.name.indexOf("\n") >= 0 || layer.name.indexOf("\r") >= 0) {
+            throw new Error("Use nonempty, single-line layer names.");
+        }
+        for (var i = 1; i <= comp.numLayers; i++) {
+            if (i !== layer.index && comp.layer(i).name === layer.name) {
+                throw new Error("Layer name is not unique: " + layer.name);
+            }
+        }
+        if (layer.transform.position.dimensionsSeparated) {
+            throw new Error("Combine separated Position dimensions first.");
+        }
+    }
+
+    function selectedLimb(comp, allowSharedParent) {
+        if (!(comp instanceof CompItem) || comp.selectedLayers.length !== 3) {
+            throw new Error("Select upper limb, lower limb, and target null.");
+        }
+        var layers = comp.selectedLayers.slice().sort(function (a, b) { return a.index - b.index; });
+        var target = layers[2];
+        var parent = allowSharedParent ? target.parent : null;
+        if (parent && parent.threeDLayer) throw new Error("Use a shared 2D parent.");
+        layers.forEach(function (layer) { requireLayer(comp, layer, parent); });
+        if (!target.nullLayer) {
+            throw new Error("Use two limb layers above a target null.");
+        }
+        return layers;
+    }
+
+    function installRig(label, target, controls, driven, expressions, insideUndoGroup) {
+        var effects = target.property("ADBE Effect Parade");
+        controls.forEach(function (control) {
+            if (effects.property(control[0])) throw new Error("Target already has a control named " + control[0] + ".");
+            if (!effects.canAddProperty(control[1])) throw new Error("EffectCraft cannot add " + control[1] + ".");
+        });
+        if (!insideUndoGroup) app.beginUndoGroup(label);
+        var applied = 0, added = [];
+        try {
+            controls.forEach(function (spec) {
+                var effect = effects.addProperty(spec[1]);
+                added.push(effect);
+                effect.name = spec[0];
+            });
+            for (var j = 0; j < driven.length; j++) {
+                driven[j].expression = expressions[j];
+                applied++;
+                if (driven[j].expressionError) throw new Error(driven[j].expressionError);
+            }
+        } catch (error) {
+            while (applied) driven[--applied].expression = "";
+            while (added.length) added.pop().remove();
+            throw error;
+        } finally {
+            if (!insideUndoGroup) app.endUndoGroup();
+        }
+        return target.name;
+    }
+
+    function makeOneBone(comp) {
+        if (!(comp instanceof CompItem) || comp.selectedLayers.length !== 2) {
+            throw new Error("Select one limb and its target null.");
+        }
+        var layers = comp.selectedLayers.slice().sort(function (a, b) { return a.index - b.index; });
+        var limb = layers[0], target = layers[1];
+        layers.forEach(function (layer) { requireLayer(comp, layer); });
+        if (limb.nullLayer || !target.nullLayer) throw new Error("Put the limb above its target null.");
+        var rotation = limb.transform.rotation;
+        requirePlain(rotation, "Limb Rotation");
+        if (limb.transform.position.expression || target.transform.position.expression) {
+            throw new Error("Remove limb/target Position expressions to avoid cycles.");
+        }
+        var a = limb.transform.position.value, b = target.transform.position.value;
+        var dx = b[0] - a[0], dy = b[1] - a[1];
+        if (magnitude(dx, dy) < 0.001) throw new Error("Separate limb and target pivots.");
+        var offset = rotation.value - Math.atan2(dy, dx) * 180 / Math.PI;
+        var expression = "var driver = thisComp.layer(" + JSON.stringify(target.name) + ");\n" +
+            "var p = transform.position, q = driver.transform.position;\n" +
+            "var x = q[0]-p[0], y = q[1]-p[1];\n" +
+            'driver.effect("Use FK")(1) > 0 ? value + driver.effect("FK Rotation")(1)*1 :\n' +
+            "x*x+y*y < 0.000001 ? value : Math.atan2(y,x)*180/Math.PI + (" + offset + ");";
+        return installRig("Build One-Bone IK/FK", target, [
+            ["Use FK", "ADBE Checkbox Control"], ["FK Rotation", "ADBE Angle Control"]
+        ], [rotation], [expression]);
+    }
+
+    // Serialized into each expression. Keep independent of the panel and scripting host.
+    function solveThreeBone(root, target, rest, lead, flip) {
+        var a = rest.lengths[0], b = rest.lengths[1], c = rest.lengths[2];
+        var x = target[0]-root[0], y = target[1]-root[1];
+        var distance = Math.sqrt(x*x+y*y);
+        var heading = distance > 1e-8 ? Math.atan2(y,x) : rest.heading;
+        var reach = Math.max(2*Math.max(a,b,c)-a-b-c, Math.min(a+b+c,distance));
+        var preferred = rest.lead + lead * Math.PI / 180;
+        preferred = Math.atan2(Math.sin(preferred),Math.cos(preferred));
+        function acos(v) { return Math.acos(Math.max(-1,Math.min(1,v))); }
+        if (reach > 1e-8) {
+            // The two trailing bones can span an annulus around the first joint.
+            var inner = Math.abs(b-c), outer = b+c, base = a*a+reach*reach;
+            var min = acos((base-inner*inner)/(2*a*reach));
+            var max = acos((base-outer*outer)/(2*a*reach));
+            preferred = (preferred < 0 ? -1 : 1) * Math.max(min,Math.min(max,Math.abs(preferred)));
+        }
+        var first = heading + preferred;
+        var jx = a*Math.cos(first), jy = a*Math.sin(first);
+        var tx = reach*Math.cos(heading)-jx, ty = reach*Math.sin(heading)-jy;
+        var tail = Math.sqrt(tx*tx+ty*ty);
+        var second = tail > 1e-8 ? Math.atan2(ty,tx) + (flip ? -1 : 1)*rest.side*acos((b*b+tail*tail-c*c)/(2*b*tail)) : first + rest.fold * (flip ? -1 : 1);
+        var ex = b*Math.cos(second), ey = b*Math.sin(second);
+        var third = Math.atan2(ty-ey,tx-ex);
+        return [[root[0]+jx,root[1]+jy], [root[0]+jx+ex,root[1]+jy+ey], [first,second,third]];
+    }
+
+    function makeThreeBone(comp) {
+        if (!(comp instanceof CompItem) || comp.selectedLayers.length !== 4) {
+            throw new Error("Select three limbs and a target null in root-to-tip timeline order.");
+        }
+        var layers = comp.selectedLayers.slice().sort(function (a, b) { return a.index - b.index; });
+        var target = layers.pop();
+        layers.concat([target]).forEach(function (layer) { requireLayer(comp, layer); });
+        if (!target.nullLayer || layers.some(function (layer) { return layer.nullLayer; })) {
+            throw new Error("Use three art layers above one target null.");
+        }
+        var positions = layers.map(function (layer) { return layer.transform.position; });
+        var rotations = layers.map(function (layer) { return layer.transform.rotation; });
+        rotations.forEach(function (p) { requirePlain(p, "Limb Rotation"); });
+        requirePlain(positions[1], "Second Limb Position");
+        requirePlain(positions[2], "Third Limb Position");
+        var goal = target.transform.position;
+        if (positions[0].expression || goal.expression) throw new Error("Remove root/target Position expressions to avoid cycles.");
+        var points = positions.concat([goal]).map(function (p) { return p.value; });
+        var angles = [], lengths = [];
+        for (var i = 0; i < 3; i++) {
+            var dx = points[i+1][0]-points[i][0], dy = points[i+1][1]-points[i][1];
+            lengths.push(magnitude(dx,dy));
+            angles.push(Math.atan2(dy,dx));
+        }
+        if (Math.min.apply(null,lengths) < 0.001) throw new Error("Separate each limb pivot and target in the rest pose.");
+        var a = points[0], b = points[1], c = points[2], d = points[3];
+        var heading = Math.atan2(d[1]-a[1],d[0]-a[0]);
+        var cross = (d[0]-b[0])*(c[1]-b[1])-(d[1]-b[1])*(c[0]-b[0]);
+        var rest = { lengths: lengths, heading: heading, lead: angles[0]-heading, fold: angles[1]-angles[0], side: cross < 0 ? -1 : 1 };
+        var source = solveThreeBone.toString() + "\n" +
+            "var root = thisComp.layer(" + JSON.stringify(layers[0].name) + ").transform.position;\n" +
+            "var driver = thisComp.layer(" + JSON.stringify(target.name) + ");\n" +
+            "var rig = solveThreeBone(root, driver.transform.position, " + JSON.stringify(rest) +
+            ', driver.effect("Lead Angle")(1)*1, driver.effect("Flip Tail Bend")(1)>0);\n';
+        var expressions = rotations.map(function (rotation, j) {
+            return source + "rig[2][" + j + "]*180/Math.PI + (" + (rotation.value-angles[j]*180/Math.PI) + ");";
+        });
+        expressions.push(source + "rig[0];", source + "rig[1];");
+        return installRig("Build Three-Bone IK", target, [
+            ["Lead Angle", "ADBE Angle Control"], ["Flip Tail Bend", "ADBE Checkbox Control"]
+        ], rotations.concat(positions.slice(1)), expressions);
+    }
+
+    function makeBezier(comp, forward) {
+        var layers = comp instanceof CompItem ? comp.selectedLayers.slice() : [];
+        var controlCount = forward ? 4 : 3;
+        if (layers.length < 2+controlCount || layers.length > 16+controlCount) {
+            throw new Error("Select 2–16 limbs above " + (forward ? "four" : "three") + " control nulls.");
+        }
+        layers.sort(function (a, b) { return a.index - b.index; });
+        layers.forEach(function (layer) { requireLayer(comp, layer); });
+        var controls = layers.splice(-controlCount);
+        if (layers.some(function (layer) { return layer.nullLayer; }) || controls.some(function (layer) { return !layer.nullLayer; })) {
+            throw new Error("Put the limb art above the " + (forward ? "root, " : "") + "start handle, end handle, and tip nulls.");
+        }
+        var root = forward ? controls.shift() : null, handles = controls, target = handles[2];
+        var inputs = [layers[0]].concat(handles);
+        if (root && (root.transform.position.expression || root.transform.rotation.expression || target.transform.rotation.expression)) {
+            throw new Error("Remove expressions from root Position and root/tip Rotation.");
+        }
+        var controlPoints = inputs.map(function (layer) {
+            if (layer.transform.position.expression) throw new Error("Remove Position expressions from root and control layers.");
+            return layer.transform.position.value;
+        });
+        var rest = layers.concat([target]).map(function (layer) { return layer.transform.position.value; });
+        var distances = [0], lengths = [], offsets = [];
+        layers.forEach(function (layer, i) {
+            var t = layer.transform, x = rest[i+1][0]-rest[i][0], y = rest[i+1][1]-rest[i][1];
+            if (i || forward) requirePlain(t.position, "Limb Position");
+            requirePlain(t.rotation, "Limb Rotation");
+            requirePlain(t.scale, "Limb Scale");
+            var length = magnitude(x,y);
+            if (length < 0.001) throw new Error("Separate adjacent limb pivots and the tip in the setup pose.");
+            lengths.push(length);
+            distances.push(distances[i]+length);
+            offsets.push(t.rotation.value - Math.atan2(y,x)*180/Math.PI);
+        });
+        var total = distances[layers.length];
+        function layerRef(layer) { return "thisComp.layer(" + JSON.stringify(layer.name) + ")"; }
+        var source = bezierSegment.toString() + "\nvar points = [" + inputs.map(function (layer, i) {
+            return forward && !i ? JSON.stringify(controlPoints[0]) : layerRef(layer) + ".transform.position";
+        }).join(",") + "];\n";
+        if (forward) {
+            source += bezierForwardPoints.toString() + "\nvar rootCtrl = " + layerRef(root) + ".transform;\n" +
+                "points = bezierForwardPoints(points, rootCtrl.position, " + JSON.stringify(root.transform.position.value) +
+                ", rootCtrl.rotation-(" + root.transform.rotation.value + "), " + layerRef(target) +
+                ".transform.rotation-(" + target.transform.rotation.value + "));\n";
+        }
+        var driven = [], expressions = [];
+        layers.forEach(function (layer, i) {
+            var from = distances[i]/total, to = distances[i+1]/total;
+            var chord = bezierSegment(controlPoints,from,to);
+            if (magnitude(chord[1][0]-chord[0][0],chord[1][1]-chord[0][1]) < 0.001) {
+                throw new Error("Adjust the curve handles so each segment has distinct ends.");
+            }
+            var segment = source + "var p = bezierSegment(points," + from + "," + to + ");\n";
+            if (i || forward) {
+                driven.push(layer.transform.position);
+                expressions.push(segment + "p[0];");
+            }
+            segment += "var x = p[1][0]-p[0][0], y = p[1][1]-p[0][1];\n";
+            driven.push(layer.transform.rotation, layer.transform.scale);
+            expressions.push(segment + "x*x+y*y < 1e-12 ? value : Math.atan2(y,x)*180/Math.PI + (" + offsets[i] + ");",
+                segment + "var ratio = Math.sqrt(x*x+y*y)/" + lengths[i] + "; value.map(function (v) { return v*ratio; });");
+        });
+        return installRig(forward ? "Build Bézier FK" : "Build Bézier IK", forward ? root : target, [], driven, expressions);
+    }
+
+    function makeRig(comp, switchable, templateLayers) {
+        var layers = templateLayers || selectedLimb(comp), upper = layers[0], lower = layers[1], target = layers[2];
+        var root = upper.transform.position;
+        var elbow = lower.transform.position;
+        var upperRotation = upper.transform.rotation;
+        var lowerRotation = lower.transform.rotation;
+        requirePlain(elbow, "Lower Position");
+        requirePlain(upperRotation, "Upper Rotation");
+        requirePlain(lowerRotation, "Lower Rotation");
+        if (switchable) {
+            requirePlain(upper.transform.scale, "Upper Scale");
+            requirePlain(lower.transform.scale, "Lower Scale");
+        }
+        if (root.expression || target.transform.position.expression) {
+            throw new Error("Remove existing root/target Position expressions to avoid cycles.");
+        }
+
+        var a = root.value, b = elbow.value, c = target.transform.position.value;
+        var ux = b[0] - a[0], uy = b[1] - a[1];
+        var lx = c[0] - b[0], ly = c[1] - b[1];
+        var dx = c[0] - a[0], dy = c[1] - a[1];
+        var l1 = magnitude(ux, uy), l2 = magnitude(lx, ly);
+        if (Math.min(l1, l2, magnitude(dx, dy)) < 0.001) {
+            throw new Error("Separate shoulder, elbow, and target pivots.");
+        }
+        var side = dx * uy - dy * ux < 0 ? -1 : 1;
+        var upperOffset = upperRotation.value - Math.atan2(uy, ux) * 180 / Math.PI;
+        var lowerOffset = lowerRotation.value - Math.atan2(ly, lx) * 180 / Math.PI;
+        var targetRef = "thisComp.layer(" + JSON.stringify(target.name) + ")";
+        var source = "var a = thisComp.layer(" + JSON.stringify(upper.name) + ").transform.position;\n" +
+            "var c = " + targetRef + ".transform.position;\n" +
+            "var x = c[0] - a[0], y = c[1] - a[1];\n" +
+            "var d = Math.sqrt(x*x + y*y);\n" +
+            "var h = d > 0.000001 ? Math.atan2(y,x) : " + Math.atan2(dy, dx) + ";\n" +
+            "var l1 = " + l1 + ", l2 = " + l2 + ";\n";
+        if (switchable) source += "var driver = " + targetRef + ";\n" +
+            'var fk = driver.effect("Use FK")(1) > 0;\n' +
+            'var stretch = !fk && driver.effect("Stretch IK")(1) > 0 ? Math.max(1, d/(l1+l2)) : 1;\n' +
+            "l1 *= stretch; l2 *= stretch;\n";
+        var scaleSource = source;
+        source +=
+            "var r = Math.max(Math.abs(l1-l2), Math.min(l1+l2, d));\n" +
+            "var k = r > 0.000001 ? (l1*l1+r*r-l2*l2)/(2*l1*r) : 0;\n" +
+            (switchable ? 'var bend = driver.effect("Flip IK Bend")(1) > 0 ? -1 : 1;\n' : "") +
+            "var ang = h + " + (switchable ? "bend * " : "") + "(" + side + ") * Math.acos(Math.max(-1,Math.min(1,k)));\n" +
+            "var ex = Math.cos(ang)*l1, ey = Math.sin(ang)*l1;\n";
+        var driven = [upperRotation, elbow, lowerRotation];
+        var upperAngle = "ang * 180 / Math.PI + (" + upperOffset + ")";
+        var lowerAngle = "Math.atan2(Math.sin(h)*r-ey, Math.cos(h)*r-ex) * 180 / Math.PI + (" + lowerOffset + ")";
+        var controls = [
+            ["Use FK", "ADBE Checkbox Control"],
+            ["FK Shoulder", "ADBE Angle Control"],
+            ["FK Elbow", "ADBE Angle Control"],
+            ["Flip IK Bend", "ADBE Checkbox Control"],
+            ["Stretch IK", "ADBE Checkbox Control"]
+        ];
+        if (switchable) {
+            var metadata = { layers: layers.map(function (layer) { return layer.name; }), restUpper: upperRotation.value,
+                restLower: lowerRotation.value, lowerOffset: lowerOffset, l2: l2, side: side, stretchReach: l1 + l2 };
+            source = rigTag + JSON.stringify(metadata) + "\n" + source;
+            source += 'var shoulder = driver.effect("FK Shoulder")(1) * 1;\n' +
+                'var elbow = driver.effect("FK Elbow")(1) * 1;\n' +
+                "if (fk) {\n" +
+                "    var fkAng = (" + Math.atan2(uy, ux) + ") + shoulder * Math.PI / 180;\n" +
+                "    ex = Math.cos(fkAng)*l1; ey = Math.sin(fkAng)*l1;\n" +
+                "}\n";
+            upperAngle = "fk ? (" + upperRotation.value + ") + shoulder : " + upperAngle;
+            lowerAngle = "fk ? (" + lowerRotation.value + ") + shoulder + elbow : " + lowerAngle;
+        }
+        var expressions = [source + upperAngle + ";", source + "[a[0] + ex, a[1] + ey];", source + lowerAngle + ";"];
+        if (switchable) {
+            var scaleExpression = scaleSource + "value.map(function (axis) { return axis * stretch; });";
+            driven.push(upper.transform.scale, lower.transform.scale);
+            expressions.push(scaleExpression, scaleExpression);
+        }
+
+        return installRig(switchable ? "Build Two-Bone IK/FK" : "Build Two-Bone IK",
+            target, switchable ? controls : [], driven, expressions, !!templateLayers);
+    }
+
+    function makeLimbTemplate(comp, leg) {
+        if (!(comp instanceof CompItem)) throw new Error("Open a composition first.");
+        var label = leg ? "Leg" : "Arm";
+        var joints = leg ? ["Hip", "Knee", "Ankle"] : ["Shoulder", "Elbow", "Wrist"];
+        var offsets = leg ? [[0,-0.24],[0.07,0],[0,0.24]] : [[-0.24,0],[0,0.07],[0.24,0]];
+        var size = Math.min(comp.width, comp.height), created = [];
+        var prefix = label, n = 2;
+        function used(name) { return joints.some(function (joint) { return !!comp.layer(name + " - " + joint); }); }
+        while (used(prefix)) prefix = label + " " + n++;
+        app.beginUndoGroup("Create " + label + " Template");
+        try {
+            for (var i = 2; i >= 0; i--) {
+                var layer = comp.layers.addNull();
+                created.unshift(layer);
+                layer.name = prefix + " - " + joints[i];
+                layer.transform.anchorPoint.setValue([0,0]);
+                layer.transform.position.setValue([comp.width/2 + size*offsets[i][0], comp.height/2 + size*offsets[i][1]]);
+            }
+            var target = makeRig(comp, true, created);
+            for (var j = 1; j <= comp.numLayers; j++) comp.layer(j).selected = false;
+            created[2].selected = true;
+            return prefix + " ready. Bind artwork to its bones; animate " + target + ".";
+        } catch (error) {
+            created.forEach(function (layer) { layer.remove(); });
+            throw error;
+        } finally {
+            app.endUndoGroup();
+        }
+    }
+
+    // FK chains: parented bone nulls from root to tip; tails and hair add overlap controls on the root.
+    function makeChainTemplate(comp, index) {
+        if (!(comp instanceof CompItem)) throw new Error("Open a composition first.");
+        var specs = [
+            null, null,
+            { label: "Spine", joints: ["Hips", "Spine", "Chest", "Neck", "Head"], start: [0, 0.18], step: [0, -0.09] },
+            { label: "Tail", joints: ["Tail 1", "Tail 2", "Tail 3", "Tail 4", "Tail 5"], start: [-0.25, 0], step: [0.1, 0], overlap: true },
+            { label: "Hair", joints: ["Hair 1", "Hair 2", "Hair 3", "Hair 4"], start: [0, -0.2], step: [0, 0.1], overlap: true }
+        ];
+        var spec = specs[index], size = Math.min(comp.width, comp.height), created = [];
+        var prefix = spec.label, n = 2;
+        function used(name) { return spec.joints.some(function (joint) { return !!comp.layer(name + " - " + joint); }); }
+        while (used(prefix)) prefix = spec.label + " " + n++;
+        app.beginUndoGroup("Create " + spec.label + " Template");
+        try {
+            var world = [];
+            spec.joints.forEach(function (joint, i) {
+                var layer = comp.layers.addNull();
+                layer.name = prefix + " - " + joint;
+                layer.transform.anchorPoint.setValue([0, 0]);
+                var at = [comp.width/2 + size*(spec.start[0] + i*spec.step[0]), comp.height/2 + size*(spec.start[1] + i*spec.step[1])];
+                if (i) {
+                    // Template parents are unrotated with zero anchors, so local Position is the offset from the parent.
+                    layer.parent = created[i - 1];
+                    layer.moveAfter(created[i - 1]);
+                    layer.transform.position.setValue([at[0] - world[i - 1][0], at[1] - world[i - 1][1]]);
+                } else layer.transform.position.setValue(at);
+                created.push(layer);
+                world.push(at);
+            });
+            if (spec.overlap) addOverlap(created);
+            for (var j = 1; j <= comp.numLayers; j++) comp.layer(j).selected = false;
+            created[0].selected = true;
+            return prefix + " ready. Bind artwork to its bones; animate bone Rotation" + (spec.overlap ? " on " + created[0].name + " for overlap." : ".");
+        } catch (error) {
+            created.reverse().forEach(function (layer) { layer.remove(); });
+            throw error;
+        } finally {
+            app.endUndoGroup();
+        }
+    }
+
+    function rigSpec(layers) {
+        var upper = layers[0], lower = layers[1];
+        var ur = upper.transform.rotation, lr = lower.transform.rotation;
+        var elbow = lower.transform.position;
+        var header = (ur.expression || "").split("\n")[0];
+        if (header.indexOf(rigTag) !== 0 || ![ur, lr, elbow].every(function (p) {
+            return (p.expression || "").split("\n")[0] === header && p.expressionEnabled && !p.expressionError;
+        })) throw new Error("Select a working two-bone IK/FK rig built with this version.");
+        var spec = JSON.parse(header.slice(rigTag.length));
+        if (JSON.stringify(spec.layers) !== JSON.stringify(layers.map(function (layer) { return layer.name; }))) {
+            throw new Error("Select the original upper, lower, and target layers.");
+        }
+        return spec;
+    }
+
+    function groupRigs(comp) {
+        if (!(comp instanceof CompItem) || !comp.selectedLayers.length) throw new Error("Select at least one IK/FK target null.");
+        var targets = comp.selectedLayers.slice(), members = [];
+        targets.forEach(function (target) {
+            if (!target.nullLayer) throw new Error("Select only the IK/FK target nulls.");
+            var found = [];
+            for (var i = 1; i <= comp.numLayers; i++) {
+                var layer = comp.layer(i);
+                if (!(layer instanceof AVLayer)) continue;
+                var header = (layer.transform.rotation.expression || "").split("\n")[0];
+                if (header.indexOf(rigTag) !== 0) continue;
+                var spec = JSON.parse(header.slice(rigTag.length));
+                if (spec.layers[0] === layer.name && spec.layers[2] === target.name) found.push(spec.layers);
+            }
+            if (found.length !== 1) throw new Error("No unique two-bone IK/FK rig for " + target.name + ".");
+            var layers = found[0].map(function (name) { return comp.layer(name); });
+            if (layers.some(function (layer) { return !layer; }) || layers[2] !== target) throw new Error("Restore the original rig layer names.");
+            layers.forEach(function (layer) {
+                requireLayer(comp, layer);
+                if (members.indexOf(layer) >= 0) throw new Error("Selected rigs share layers.");
+                members.push(layer);
+            });
+            rigSpec(layers);
+        });
+        var name = "Rig Master", suffix = 2;
+        while (comp.layer(name)) name = "Rig Master " + suffix++;
+        var center = [comp.width/2,comp.height/2], master, linked = [];
+        app.beginUndoGroup("Group IK/FK Rigs Under Master");
+        try {
+            master = comp.layers.addNull();
+            master.name = name;
+            // Identity matrix at setup: change hierarchy without rewriting any local keys.
+            master.transform.anchorPoint.setValue(center);
+            master.transform.position.setValue(center);
+            members.forEach(function (layer) { layer.setParentWithJump(master); linked.push(layer); });
+            targets.forEach(function (layer) { layer.selected = false; });
+            master.selected = true;
+        } catch (error) {
+            linked.forEach(function (layer) { layer.setParentWithJump(null); });
+            if (master) master.remove();
+            throw error;
+        } finally {
+            app.endUndoGroup();
+        }
+        return "Grouped " + targets.length + " rig(s). Animate " + name + " Position or Rotation.";
+    }
+
+    function matchPose(comp) {
+        var layers = selectedLimb(comp, true), upper = layers[0], lower = layers[1], target = layers[2];
+        var ur = upper.transform.rotation, lr = lower.transform.rotation;
+        var elbow = lower.transform.position, goal = target.transform.position;
+        var spec = rigSpec(layers);
+        var rack = target.property("ADBE Effect Parade");
+        function control(name, matchName) {
+            var effect = rack.property(name), property = effect && effect.property(1);
+            if (!property || effect.matchName !== matchName || property.expression) throw new Error("Restore control: " + name);
+            return property;
+        }
+        var mode = control("Use FK", "ADBE Checkbox Control");
+        if (goal.expression) throw new Error("Target Position must not have an expression.");
+        var fromFk = Number(mode.value) > 0, edits;
+        if (fromFk) {
+            var root = upper.transform.position.value, joint = elbow.value;
+            var angle = (lr.value - spec.lowerOffset) * Math.PI / 180;
+            var tip = [joint[0] + spec.l2 * Math.cos(angle), joint[1] + spec.l2 * Math.sin(angle)];
+            var dx = tip[0] - root[0], dy = tip[1] - root[1];
+            if (magnitude(dx, dy) < 0.001) throw new Error("Move the FK tip away from the shoulder before matching this fully folded pose.");
+            var flip = control("Flip IK Bend", "ADBE Checkbox Control");
+            var cross = dx * (joint[1] - root[1]) - dy * (joint[0] - root[0]);
+            edits = [[goal, tip]];
+            if (Math.abs(cross) > 0.000001) edits.push([flip, cross * spec.side < 0]);
+        } else {
+            if (spec.stretchReach && Number(control("Stretch IK", "ADBE Checkbox Control").value) > 0) {
+                var a = upper.transform.position.value, c = goal.value;
+                if (magnitude(c[0] - a[0], c[1] - a[1]) > spec.stretchReach + 0.001) {
+                    throw new Error("Move the target within rest reach before matching to FK.");
+                }
+            }
+            var shoulderAngle = ur.value - spec.restUpper;
+            edits = [
+                [control("FK Shoulder", "ADBE Angle Control"), shoulderAngle],
+                [control("FK Elbow", "ADBE Angle Control"), lr.value - spec.restLower - shoulderAngle]
+            ];
+        }
+        edits.push([mode, !fromFk]);
+        var time = comp.time;
+        app.beginUndoGroup("Match Pose and Switch IK/FK");
+        try {
+            edits.forEach(function (edit) {
+                // A new first key changes the value before the switch too. Preserve it first.
+                if ((!edit[0].numKeys || time < edit[0].keyTime(1)) && time >= comp.frameDuration) {
+                    edit[0].setValueAtTime(time - comp.frameDuration, edit[0].value);
+                }
+                edit[0].setValueAtTime(time, edit[1]);
+            });
+        } finally {
+            app.endUndoGroup();
+        }
+        return fromFk ? "Pose matched. Switched to IK." : "Pose matched. Switched to FK.";
+    }
+
+    build.onClick = function () {
+        try {
+            status.text = "Rig ready. Animate Position on " + makeRig(app.project.activeItem) + ".";
+        } catch (error) {
+            status.text = "Rig not built: " + error.message;
+        }
+    };
+    buildSwitchable.onClick = function () {
+        try {
+            status.text = "IK/FK ready. Keyframe Use FK, FK Shoulder, and FK Elbow on " + makeRig(app.project.activeItem, true) + ".";
+        } catch (error) {
+            status.text = "Rig not built: " + error.message;
+        }
+    };
+    match.onClick = function () {
+        try { status.text = matchPose(app.project.activeItem); }
+        catch (error) { status.text = "Pose not matched: " + error.message; }
+    };
+    buildOne.onClick = function () {
+        try { status.text = "One-bone IK/FK ready. Animate Position, Use FK, or FK Rotation on " + makeOneBone(app.project.activeItem) + "."; }
+        catch (error) { status.text = "Rig not built: " + error.message; }
+    };
+    buildThree.onClick = function () {
+        try { status.text = "Three-bone IK ready. Animate Position on " + makeThreeBone(app.project.activeItem) + "."; }
+        catch (error) { status.text = "Rig not built: " + error.message; }
+    };
+    buildBezier.onClick = function () {
+        try { status.text = "Bezier IK ready. Animate both handle nulls and tip " + makeBezier(app.project.activeItem) + "."; }
+        catch (error) { status.text = "Rig not built: " + error.message; }
+    };
+    buildBezierFk.onClick = function () {
+        try { status.text = "Bezier FK ready. Animate root and tip Rotation. Root: " + makeBezier(app.project.activeItem, true) + "."; }
+        catch (error) { status.text = "Rig not built: " + error.message; }
+    };
+    buildTemplate.onClick = function () {
+        var index = template.selection ? template.selection.index : 0;
+        try { status.text = index < 2 ? makeLimbTemplate(app.project.activeItem, index === 1) : makeChainTemplate(app.project.activeItem, index); }
+        catch (error) { status.text = "Template not built: " + error.message; }
+    };
+    buildMaster.onClick = function () {
+        try { status.text = groupRigs(app.project.activeItem); }
+        catch (error) { status.text = "Rigs not grouped: " + error.message; }
+    };
+}

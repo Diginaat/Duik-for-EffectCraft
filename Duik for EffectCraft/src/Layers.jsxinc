@@ -1,0 +1,156 @@
+function buildLayersTab(ui) {
+    ui.orientation = "column";
+    ui.alignChildren = ["fill", "top"];
+    ui.add("statictext", undefined, "Select unparented 2D layers for aligned controls.");
+    var shapeRow = ui.add("group");
+    shapeRow.add("statictext", undefined, "Controller shape");
+    var shapes = ["Null", "Circle", "Square", "Cross", "Arrows"];
+    var controllerShape = shapeRow.add("dropdownlist", undefined, shapes, { name: "controllerShape" });
+    controllerShape.selection = 0;
+    var status = ui.add("statictext", undefined, "Ready.", { multiline: true });
+    status.preferredSize = [300, 42];
+
+    function button(label, name, run, parent) {
+        (parent || ui).add("button", undefined, label, { name: name }).onClick = function () {
+            var comp = app.project.activeItem;
+            if (!(comp instanceof CompItem)) { status.text = "Open a composition first."; return; }
+            app.beginUndoGroup(label);
+            try { status.text = run(comp); }
+            catch (error) { status.text = error.message; }
+            finally { app.endUndoGroup(); }
+        };
+    }
+
+    // Shape-layer controller icons in layer space, centered on the layer origin.
+    function addShapeController(comp, kind) {
+        var layer = comp.layers.addShape();
+        var content = layer.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group");
+        content.name = kind;
+        var items = content.property("ADBE Vectors Group");
+        function line(points, closed) {
+            var shape = new Shape();
+            shape.vertices = points;
+            shape.closed = !!closed;
+            items.addProperty("ADBE Vector Shape - Group").property("ADBE Vector Shape").setValue(shape);
+        }
+        if (kind === "Circle") items.addProperty("ADBE Vector Shape - Ellipse").property("ADBE Vector Ellipse Size").setValue([60, 60]);
+        else if (kind === "Square") items.addProperty("ADBE Vector Shape - Rect").property("ADBE Vector Rect Size").setValue([60, 60]);
+        else if (kind === "Cross") { line([[-30, 0], [30, 0]]); line([[0, -30], [0, 30]]); }
+        else {
+            [[1, 0], [0, 1], [-1, 0], [0, -1]].forEach(function (d) {
+                var tip = [d[0] * 36, d[1] * 36], base = [d[0] * 22, d[1] * 22], side = [-d[1] * 8, d[0] * 8];
+                line([[0, 0], tip]);
+                line([[base[0] + side[0], base[1] + side[1]], tip, [base[0] - side[0], base[1] - side[1]]]);
+            });
+        }
+        var stroke = items.addProperty("ADBE Vector Graphic - Stroke");
+        stroke.property("ADBE Vector Stroke Color").setValue([0.92, 0.25, 0.2, 1]);
+        stroke.property("ADBE Vector Stroke Width").setValue(4);
+        layer.transform.anchorPoint.setValue([0, 0]);
+        return layer;
+    }
+
+    function addControls(comp, parentArt) {
+        var selection = comp.selectedLayers.slice();
+        if (parentArt && !selection.length) throw new Error("Select at least one layer.");
+        var placements = selection.map(function (layer) {
+            if (!(layer instanceof AVLayer) || layer.threeDLayer || layer.parent || layer.locked ||
+                layer.transform.position.dimensionsSeparated) {
+                throw new Error("Select unlocked, unparented 2D layers with combined Position.");
+            }
+            if (parentArt) {
+                var transform = layer.transform;
+                [transform.position, transform.rotation, transform.scale, transform.anchorPoint].forEach(function (p) {
+                    if (p.numKeys || p.expression) throw new Error("Remove animated transforms before adding zero controls.");
+                });
+            }
+            return { layer: layer, position: layer.transform.position.value };
+        });
+        if (!placements.length) placements.push({ layer: null, position: [comp.width / 2, comp.height / 2] });
+        var kind = parentArt ? "Null" : shapes[controllerShape.selection.index];
+        placements.forEach(function (item) {
+            var control = kind === "Null" ? comp.layers.addNull() : addShapeController(comp, kind);
+            var base = item.layer ? ((parentArt ? "Zero - " : "Ctrl - ") + item.layer.name) : "Controller";
+            var candidate = base;
+            for (var suffix = 2; comp.layer(candidate) && comp.layer(candidate) !== control; suffix++) candidate = base + " " + suffix;
+            control.name = candidate;
+            if (parentArt) control.transform.anchorPoint.setValue([0, 0]);
+            control.transform.position.setValue(item.position);
+            if (parentArt) item.layer.parent = control;
+        });
+        return "Created " + placements.length + (parentArt ? " zero control(s)." : " controller(s).");
+    }
+
+    button("Add Controllers", "addControls", function (comp) { return addControls(comp, false); });
+    button("Add Zero Parents", "addZeros", function (comp) { return addControls(comp, true); });
+    var native = ui.add("group");
+    button("Add Comp-Sized Solid", "addSolid", function (comp) {
+        comp.layers.addSolid([1, 1, 1], "Solid", comp.width, comp.height, comp.pixelAspect, comp.duration);
+        return "Created comp-sized solid.";
+    }, native);
+    button("Add Adjustment Layer", "addAdjustment", function (comp) {
+        var layer = comp.layers.addSolid([1, 1, 1], "Adjustment", comp.width, comp.height, comp.pixelAspect, comp.duration);
+        layer.adjustmentLayer = true;
+        return "Created adjustment layer.";
+    }, native);
+
+    ui.add("statictext", undefined, "Rename selected layers; expression references follow.");
+    var renameRow = ui.add("group"), affixRow = ui.add("group");
+    function field(parent, label, name) {
+        parent.add("statictext", undefined, label);
+        var input = parent.add("edittext", undefined, "", { name: name });
+        input.characters = 7;
+        return input;
+    }
+    var find = field(renameRow, "Find", "renameFind");
+    var replace = field(renameRow, "Replace", "renameReplace");
+    var prefix = field(affixRow, "Prefix", "renamePrefix");
+    var suffix = field(affixRow, "Suffix", "renameSuffix");
+
+    // Rewrites layer("name") references and names stored in Duik rig metadata comments.
+    function retarget(comp, renames) {
+        for (var i = 1; i <= comp.numLayers; i++) {
+            (function walk(group) {
+                for (var j = 1; j <= group.numProperties; j++) {
+                    var p = group.property(j);
+                    if (p instanceof PropertyGroup) { walk(p); continue; }
+                    if (!(p instanceof Property) || !p.expression) continue;
+                    var code = p.expression, next = code;
+                    renames.forEach(function (r) {
+                        var from = JSON.stringify(r[0]), to = JSON.stringify(r[1]);
+                        next = next.split("layer(" + from + ")").join("layer(" + to + ")");
+                        next = next.replace(/^\/\/ EC-Duik-.*$/gm, function (line) { return line.split(from).join(to); });
+                    });
+                    if (next !== code) p.expression = next;
+                }
+            })(comp.layer(i));
+        }
+    }
+    button("Rename", "renameLayers", function (comp) {
+        var layers = comp.selectedLayers;
+        if (!layers.length) throw new Error("Select layers to rename.");
+        if (!find.text && !prefix.text && !suffix.text) throw new Error("Enter Find, Prefix, or Suffix text.");
+        var renames = layers.map(function (layer) {
+            var name = prefix.text + (find.text ? layer.name.split(find.text).join(replace.text) : layer.name) + suffix.text;
+            if (!name || /[\r\n]/.test(name)) throw new Error("New names must be nonempty and single-line.");
+            return [layer.name, name, layer];
+        }).filter(function (r) { return r[0] !== r[1]; });
+        var taken = {};
+        for (var i = 1; i <= comp.numLayers; i++) taken[comp.layer(i).name] = (taken[comp.layer(i).name] || 0) + 1;
+        renames.forEach(function (r) { taken[r[0]]--; });
+        renames.forEach(function (r) {
+            if (taken[r[1]] > 0) throw new Error("Name already used: " + r[1]);
+            taken[r[1]] = 1;
+        });
+        renames.forEach(function (r) { r[2].name = r[1]; });
+        retarget(comp, renames);
+        return "Renamed " + renames.length + " layer(s).";
+    });
+
+    ui.add("statictext", undefined, "Composition notes (saved in the project):");
+    var notes = ui.add("edittext", undefined, "", { name: "compNotes", multiline: true });
+    notes.preferredSize = [300, 60];
+    var noteRow = ui.add("group");
+    button("Load Notes", "loadNotes", function (comp) { notes.text = comp.comment || ""; return "Loaded notes for " + comp.name + "."; }, noteRow);
+    button("Save Notes", "saveNotes", function (comp) { comp.comment = notes.text; return "Saved notes to " + comp.name + "."; }, noteRow);
+}

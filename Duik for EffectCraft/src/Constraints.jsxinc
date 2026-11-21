@@ -1,0 +1,263 @@
+function buildConstraintsTab(panel) {
+    panel.orientation = "column";
+    panel.alignChildren = ["fill", "top"];
+    panel.add("statictext", undefined, "Connector: pick a driver, then select keyed properties.");
+    var driverRow = panel.add("group");
+    driverRow.add("button", undefined, "Set Driver", { name: "setDriver" }).onClick = function () { run("Set Driver", pickDriver); };
+    var driverLabel = driverRow.add("statictext", undefined, "No driver.", { name: "driverLabel" });
+    driverLabel.preferredSize = [200, 20];
+    var range = panel.add("group");
+    function field(label, initial, name) {
+        range.add("statictext", undefined, label);
+        var input = range.add("edittext", undefined, initial, { name: name });
+        input.characters = 5;
+        return input;
+    }
+    var low = field("From", "0", "connectFrom");
+    var high = field("To", "100", "connectTo");
+    var axis = range.add("dropdownlist", undefined, ["X", "Y", "Z"], { name: "connectAxis" });
+    axis.selection = 0;
+    var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
+    status.preferredSize = [300, 42];
+
+    var driver = null;
+    var transformNames = { "ADBE Anchor Point": "anchorPoint", "ADBE Position": "position", "ADBE Position_0": "xPosition",
+        "ADBE Position_1": "yPosition", "ADBE Scale": "scale", "ADBE Rotate Z": "rotation", "ADBE Opacity": "opacity" };
+
+    function comp() {
+        var item = app.project.activeItem;
+        if (!(item instanceof CompItem)) throw new Error("Open a composition first.");
+        return item;
+    }
+    function layerOf(p) { return p.propertyGroup(p.propertyDepth); }
+    function uniqueName(c, layer) {
+        if (!layer.name || /[\r\n"\\]/.test(layer.name)) throw new Error("Use a single-line layer name without quotes or backslashes: " + layer.name);
+        for (var i = 1; i <= c.numLayers; i++) if (i !== layer.index && c.layer(i).name === layer.name) throw new Error("Layer name must be unique: " + layer.name);
+    }
+    function freshName(c, base) {
+        var name = base;
+        for (var n = 2; c.layer(name); n++) name = base + " " + n;
+        return name;
+    }
+    function number(input, label) {
+        var value = Number(input.text);
+        if (!isFinite(value)) throw new Error(label + " must be a number.");
+        return value;
+    }
+    // Evaluates comp-space math through a temporary expression; the scripting API has no toComp.
+    function evaluate(c, build) {
+        var probe = c.layers.addNull(), p = probe.transform.position;
+        try {
+            p.expression = build();
+            var v = p.value;
+            if (p.expressionError) throw new Error(p.expressionError);
+            return [v[0], v[1]];
+        } finally {
+            probe.remove();
+        }
+    }
+    function run(label, task) {
+        app.beginUndoGroup(label);
+        try { status.text = task(comp()); }
+        catch (error) { status.text = error.message; }
+        finally { app.endUndoGroup(); }
+    }
+    function button(parent, label, name, task) {
+        parent.add("button", undefined, label, { name: name }).onClick = function () { run(label, task); };
+    }
+    function row() { return panel.add("group"); }
+    function write(edits) {
+        var applied = [];
+        try {
+            edits.forEach(function (edit) {
+                edit.prop.expression = edit.code;
+                applied.push(edit.prop);
+                if (edit.prop.expressionError) throw new Error(edit.prop.expressionError);
+            });
+        } catch (error) {
+            applied.forEach(function (p) { p.expression = ""; });
+            throw error;
+        }
+    }
+    function keyedTargets(c) {
+        var props = c.selectedProperties.filter(function (p) { return p instanceof Property && p.numKeys >= 2; });
+        if (!props.length) throw new Error("Select properties with at least two keyframes.");
+        props.forEach(function (p) {
+            if (p.expression || !p.canSetExpression) throw new Error("Remove the existing expression on " + p.name + ".");
+        });
+        return props;
+    }
+
+    function pickDriver(c) {
+        var props = c.selectedProperties.filter(function (p) { return p instanceof Property; });
+        if (props.length !== 1) throw new Error("Select exactly one driver property.");
+        var p = props[0], layer = layerOf(p), parent = p.parentProperty, ref;
+        uniqueName(c, layer);
+        var head = "thisComp.layer(" + JSON.stringify(layer.name) + ")";
+        if (transformNames[p.matchName] && parent.matchName === "ADBE Transform Group") ref = head + ".transform." + transformNames[p.matchName];
+        else if (parent.parentProperty && parent.parentProperty.matchName === "ADBE Effect Parade") {
+            if (/[\r\n]/.test(parent.name)) throw new Error("Use a single-line effect name.");
+            ref = head + ".effect(" + JSON.stringify(parent.name) + ")(" + p.propertyIndex + ")";
+        } else throw new Error("Use a transform property or an effect control as the driver.");
+        var value = p.value;
+        if (typeof value !== "number" && !(Array.isArray(value) && typeof value[0] === "number")) throw new Error("Driver must be numeric.");
+        driver = { ref: ref, vector: typeof value !== "number" };
+        driverLabel.text = layer.name + " › " + (parent.matchName === "ADBE Transform Group" ? p.name : parent.name);
+        return "Driver set. Select keyed properties and click Connect.";
+    }
+    function scalar(ref, vector) {
+        return "var d = " + ref + ";\n" + (vector ? "d = d[" + axis.selection.index + "];\n" : "");
+    }
+
+    var connect = row();
+    button(connect, "Connect Keys to Driver", "connectKeys", function (c) {
+        if (!driver) throw new Error("Set a driver first.");
+        var from = number(low, "From"), to = number(high, "To");
+        if (from === to) throw new Error("From and To must differ.");
+        var props = keyedTargets(c);
+        write(props.map(function (p) {
+            return { prop: p, code: "// Connector\n" + scalar(driver.ref, driver.vector) +
+                "valueAtTime(linear(d, " + from + ", " + to + ", key(1).time, key(numKeys).time));" };
+        }));
+        return "Connected " + props.length + " property(ies). Driver " + from + "–" + to + " spans their keys.";
+    });
+    button(connect, "Effector", "effector", function (c) {
+        var props = keyedTargets(c);
+        props.forEach(function (p) {
+            var layer = layerOf(p);
+            if (layer.threeDLayer) throw new Error("Effector targets must be on 2D layers.");
+            uniqueName(c, layer);
+        });
+        var effector = c.layers.addNull();
+        try {
+            effector.name = freshName(c, "Effector");
+            effector.transform.anchorPoint.setValue([0, 0]);
+            effector.transform.position.setValue([c.width / 2, c.height / 2]);
+            var effects = effector.property("ADBE Effect Parade");
+            [["Inner Radius", 50], ["Outer Radius", 200]].forEach(function (spec) {
+                var e = effects.addProperty("ADBE Slider Control");
+                e.name = spec[0];
+                e.property(1).setValue(spec[1]);
+            });
+            var ref = "thisComp.layer(" + JSON.stringify(effector.name) + ")";
+            // Inside the inner radius the property reaches its last key; beyond the outer radius it stays at its first key.
+            write(props.map(function (p) {
+                return { prop: p, code: "// Effector\nvar e = " + ref + ", a = e.toComp([0,0]), b = toComp(anchorPoint);\n" +
+                    "var dx = a[0]-b[0], dy = a[1]-b[1], d = Math.sqrt(dx*dx+dy*dy);\n" +
+                    'var inner = e.effect("Inner Radius")(1), outer = Math.max(inner+0.001, e.effect("Outer Radius")(1));\n' +
+                    "valueAtTime(linear(d, inner, outer, key(numKeys).time, key(1).time));" };
+            }));
+        } catch (error) {
+            effector.remove();
+            throw error;
+        }
+        return "Effector ready. Move " + effector.name + " near the layers.";
+    });
+
+    var basics = row();
+    button(basics, "Lock", "lockProperty", function (c) {
+        var props = c.selectedProperties.filter(function (p) { return p instanceof Property && p.canSetExpression; });
+        if (!props.length) throw new Error("Select properties to lock.");
+        props.forEach(function (p) { if (p.expression) throw new Error("Remove the existing expression on " + p.name + "."); });
+        write(props.map(function (p) { return { prop: p, code: "// Locked\n" + JSON.stringify(p.value) + ";" }; }));
+        return "Locked " + props.length + " property(ies) at their current values.";
+    });
+    function set(p, value, time) {
+        if (p.expression) throw new Error("Remove the expression on " + p.name + " first.");
+        if (p.numKeys) p.setValueAtTime(time, value); else p.setValue(value);
+    }
+    button(basics, "Reset Transform", "resetTransform", function (c) {
+        var layers = c.selectedLayers;
+        if (!layers.length) throw new Error("Select layers to reset.");
+        layers.forEach(function (layer) {
+            var t = layer.transform;
+            set(t.rotation, 0, c.time);
+            set(t.scale, t.scale.value.map(function () { return 100; }), c.time);
+            if (layer.parent && !t.position.dimensionsSeparated) set(t.position, t.position.value.map(function () { return 0; }), c.time);
+        });
+        return "Reset " + layers.length + " layer(s). Parented layers return to their parent's origin.";
+    });
+    button(basics, "Align to Top", "alignLayers", function (c) {
+        var layers = c.selectedLayers.slice().sort(function (a, b) { return a.index - b.index; });
+        if (layers.length < 2) throw new Error("Select the target layer above the layers to align.");
+        var target = layers.shift();
+        layers.forEach(function (layer) {
+            if (layer.threeDLayer || layer.transform.position.dimensionsSeparated || layer.transform.position.expression) {
+                throw new Error("Align 2D layers with combined Position and no expression: " + layer.name);
+            }
+        });
+        var point = evaluate(c, function () { return "var l = thisComp.layer(" + target.index + "); l.toComp(l.anchorPoint);"; });
+        layers.forEach(function (layer) {
+            var local = !layer.parent ? point : evaluate(c, function () {
+                return "thisComp.layer(" + layer.parent.index + ").fromComp([" + point + "]);";
+            });
+            var value = layer.transform.position.value.slice();
+            value[0] = local[0]; value[1] = local[1];
+            set(layer.transform.position, value, c.time);
+        });
+        return "Aligned " + layers.length + " layer(s) to " + target.name + ".";
+    });
+
+    var pins = row();
+    button(pins, "Pin Path Vertices", "pinPath", function (c) {
+        var paths = c.selectedProperties.filter(function (p) {
+            return p instanceof Property && (p.matchName === "ADBE Mask Shape" || p.matchName === "ADBE Vector Shape");
+        });
+        if (paths.length !== 1) throw new Error("Select one Mask Path or shape Path.");
+        var path = paths[0], layer = layerOf(path), shape = path.value;
+        if (layer.threeDLayer) throw new Error("Use a 2D layer.");
+        if (path.numKeys || path.expression) throw new Error("Use a path without keyframes or expression.");
+        if (shape.vertices.length < 2 || shape.vertices.length > 64) throw new Error("Pin paths with 2–64 vertices.");
+        for (var g = path.parentProperty; g && g.propertyDepth > 0; g = g.parentProperty) {
+            if (g.matchName !== "ADBE Vector Group") continue;
+            var tg = g.property("ADBE Vector Transform Group");
+            var identity = { "ADBE Vector Anchor": "0,0", "ADBE Vector Position": "0,0", "ADBE Vector Scale": "100,100", "ADBE Vector Rotation": "0", "ADBE Vector Skew": "0" };
+            for (var key in identity) {
+                var part = tg.property(key);
+                if ([].concat(part.value).slice(0, 2).join(",") !== identity[key] || part.expression) {
+                    throw new Error("Reset the transforms of shape group " + g.name + " before pinning.");
+                }
+            }
+        }
+        var base = "Pin - " + layer.name.replace(/[\r\n"\\]/g, " "), created = [];
+        function toComp(point) {
+            return evaluate(c, function () { return "thisComp.layer(" + layer.index + ").toComp([" + point[0] + "," + point[1] + "]);"; });
+        }
+        function pin(name, at, parent) {
+            var n = c.layers.addNull();
+            created.push(n);
+            n.name = freshName(c, name);
+            n.transform.anchorPoint.setValue([0, 0]);
+            if (parent) {
+                n.parent = parent;
+                var origin = parent.transform.position.value;
+                n.transform.position.setValue([at[0] - origin[0], at[1] - origin[1]]);
+            } else n.transform.position.setValue(at);
+            return n;
+        }
+        try {
+            var ins = shape.inTangents || [], outs = shape.outTangents || [];
+            var refs = shape.vertices.map(function (v, i) {
+                var at = toComp(v), p = pin(base + " " + (i + 1), at), entry = { pin: p.name };
+                [["in", ins[i]], ["out", outs[i]]].forEach(function (spec) {
+                    var t = spec[1];
+                    if (t && (Math.abs(t[0]) > 1e-6 || Math.abs(t[1]) > 1e-6)) {
+                        entry[spec[0]] = pin(p.name + " " + (spec[0] === "in" ? "In" : "Out"), toComp([v[0] + t[0], v[1] + t[1]]), p).name;
+                    }
+                });
+                return entry;
+            });
+            function tangent(name, i) { return name ? "rel(at(" + JSON.stringify(name) + "), v[" + i + "])" : "[0,0]"; }
+            path.expression = "// EC-Duik-Pins\nfunction at(n) { var l = thisComp.layer(n), p = fromComp(l.toComp([0,0])); return [p[0],p[1]]; }\n" +
+                "function rel(a, b) { return [a[0]-b[0], a[1]-b[1]]; }\n" +
+                "var v = [" + refs.map(function (r) { return "at(" + JSON.stringify(r.pin) + ")"; }).join(",") + "];\n" +
+                "createPath(v, [" + refs.map(function (r, i) { return tangent(r["in"], i); }).join(",") + "], [" +
+                refs.map(function (r, i) { return tangent(r.out, i); }).join(",") + "], " + !!shape.closed + ");";
+        } catch (error) {
+            path.expression = "";
+            while (created.length) created.pop().remove();
+            throw error;
+        }
+        return "Pinned " + shape.vertices.length + " vertices. Animate the pin nulls.";
+    });
+}

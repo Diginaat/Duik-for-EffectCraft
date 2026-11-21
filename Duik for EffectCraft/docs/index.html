@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install the Duik panel in EffectCraft and learn to rig and animate with step-by-step, screenshot guides and a tab-by-tab reference.">
+  <title>Duik for EffectCraft</title>
+  <style>
+    :root { color-scheme: light; --ink: #182337; --muted: #4a5873; --paper: #f4f6fb; --surface: #fff; --line: #d9e1ee; --accent: #174db1; --soft: #eaf1ff; --mark: #e8890c; --mark-soft: #fff3e0; --ok: #0b7a55; --ok-soft: #e4f6ee; --focus: #007674; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { color-scheme: dark; --ink: #e8eef9; --muted: #b0bdd4; --paper: #0f1522; --surface: #172132; --line: #33425b; --accent: #a4c4ff; --soft: #1f2e4a; --mark: #ffb04a; --mark-soft: #3a2a12; --ok: #6fe0b3; --ok-soft: #12352a; --focus: #67e2d3; }
+    }
+    :root[data-theme="dark"] { color-scheme: dark; --ink: #e8eef9; --muted: #b0bdd4; --paper: #0f1522; --surface: #172132; --line: #33425b; --accent: #a4c4ff; --soft: #1f2e4a; --mark: #ffb04a; --mark-soft: #3a2a12; --ok: #6fe0b3; --ok-soft: #12352a; --focus: #67e2d3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 1rem/1.65 system-ui, "Segoe UI", sans-serif; }
+    a { color: var(--accent); text-underline-offset: .18em; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    code, kbd { font: .9em ui-monospace, Consolas, monospace; background: var(--soft); padding: .05rem .3rem; border-radius: .25rem; }
+    .skip { position: absolute; left: 1rem; top: 1rem; transform: translateY(-200%); padding: .5rem; background: var(--surface); }
+    .skip:focus { transform: none; }
+
+    .hero { background: #14233d; color: #fff; padding: clamp(2rem, 5vw, 4rem) max(1rem, calc((100% - 74rem) / 2)); }
+    .hero-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+    .eyebrow { margin: 0; color: #b6d0ff; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; font-size: .8rem; }
+    .hero h1 { margin: .4rem 0 .5rem; font-size: clamp(2.1rem, 5vw, 3.8rem); letter-spacing: -.035em; line-height: 1.1; }
+    .hero > p { max-width: 62ch; color: #dbe5f8; margin: 0 0 1.5rem; }
+    .paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem; max-width: 60rem; }
+    .paths a { display: block; text-decoration: none; color: #fff; background: #1f3459; border: 1px solid #36507d; border-radius: .7rem; padding: .85rem 1rem; }
+    .paths a:hover { background: #274172; }
+    .paths b { display: block; font-size: 1.05rem; }
+    .paths span { color: #c5d5f0; font-size: .9rem; }
+    .paths .n { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: #ff9f1c; color: #14233d; font-weight: 800; margin-bottom: .35rem; }
+    .theme-picker { color-scheme: dark; font-size: .9rem; color: #e0e9fa; }
+    .theme-picker select { font: inherit; color: inherit; background: #202f4b; border: 1px solid #657c9f; border-radius: .4rem; padding: .25rem .5rem; margin-left: .3rem; }
+
+    .layout { max-width: 78rem; margin: auto; padding: 1.25rem 1rem; display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: clamp(1rem, 3vw, 2.5rem); align-items: start; }
+    nav { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; padding: .8rem; background: var(--surface); border: 1px solid var(--line); border-radius: .75rem; font-size: .95rem; }
+    nav p { margin: .7rem .4rem .1rem; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    nav p:first-child { margin-top: 0; }
+    nav ul { list-style: none; margin: 0; padding: 0; }
+    nav a { display: block; padding: .18rem .4rem; border-radius: .3rem; text-decoration: none; }
+    nav a:hover { background: var(--soft); }
+    main { min-width: 0; }
+    section { margin: 0 0 1.1rem; padding: clamp(1rem, 3vw, 2rem); background: var(--surface); border: 1px solid var(--line); border-radius: .85rem; scroll-margin-top: 1rem; }
+    .part { margin: 2rem .2rem .6rem; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .part:first-child { margin-top: 0; }
+    h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); margin: 0 0 .4rem; line-height: 1.2; }
+    h3 { margin: 1.4rem 0 .35rem; line-height: 1.25; }
+    p { margin: .5rem 0 .9rem; max-width: 72ch; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: .3rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: .4rem; margin: .2rem 0 1rem; }
+    .chip { font-size: .8rem; font-weight: 600; padding: .1rem .55rem; border-radius: 99px; background: var(--soft); color: var(--accent); }
+
+    .steps { list-style: none; padding: 0; margin: 1rem 0; counter-reset: step; }
+    .steps > li { counter-increment: step; position: relative; padding: 0 0 1.4rem 2.8rem; margin: 0; }
+    .steps > li::before { content: counter(step); position: absolute; left: 0; top: -.1rem; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--surface); font-weight: 800; }
+    .steps > li:not(:last-child)::after { content: ""; position: absolute; left: .9rem; top: 2rem; bottom: .3rem; width: 2px; background: var(--line); }
+    .steps h4 { margin: 0 0 .2rem; font-size: 1.05rem; }
+    .steps p { margin: .2rem 0 .5rem; }
+    .callout-n { display: inline-grid; place-items: center; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: #ff9f1c; color: #14233d; font-size: .75rem; font-weight: 800; vertical-align: .1em; }
+
+    figure { margin: .6rem 0 1rem; }
+    figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: .5rem; cursor: zoom-in; background: #1b1b1b; }
+    figure.narrow img { max-width: min(100%, 36rem); }
+    figure.tall img { max-width: min(100%, 20rem); }
+    figcaption { color: var(--muted); font-size: .88rem; margin-top: .35rem; }
+    .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: .9rem; }
+    .pair figure { margin: 0; }
+
+    .note, .check, .warn { margin: 1rem 0; padding: .75rem 1rem; border-radius: .4rem; border-left: .3rem solid; }
+    .note { border-color: var(--accent); background: var(--soft); }
+    .check { border-color: var(--ok); background: var(--ok-soft); }
+    .warn { border-color: var(--mark); background: var(--mark-soft); }
+    .note > :first-child, .check > :first-child, .warn > :first-child { margin-top: 0; }
+    .note > :last-child, .check > :last-child, .warn > :last-child { margin-bottom: 0; }
+
+    .icons { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .3rem 1rem; padding: 0; list-style: none; }
+    .icons li { margin: 0; }
+    .gloss { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .7rem; margin: 1rem 0 0; }
+    .gloss div { border: 1px solid var(--line); border-radius: .6rem; padding: .7rem .85rem; }
+    .gloss dt { font-weight: 700; }
+    .gloss dd { margin: .15rem 0 0; color: var(--muted); }
+
+    .ref { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+    .ref figure { margin: 0; position: sticky; top: 1rem; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+    th, td { text-align: left; vertical-align: top; padding: .5rem .55rem; border-bottom: 1px solid var(--line); }
+    th { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    td:first-child { font-weight: 700; white-space: nowrap; }
+    details { border: 1px solid var(--line); border-radius: .55rem; padding: .55rem .85rem; margin: .5rem 0; }
+    details[open] { padding-bottom: .8rem; }
+    summary { cursor: pointer; font-weight: 700; }
+    details p { margin-bottom: 0; }
+
+    dialog { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 96vh; }
+    dialog::backdrop { background: rgb(0 0 0 / .8); }
+    dialog img { display: block; max-width: 96vw; max-height: 90vh; border-radius: .4rem; }
+    dialog button { position: fixed; top: .8rem; right: .8rem; font: inherit; font-weight: 700; padding: .35rem .8rem; border-radius: .4rem; border: 0; cursor: pointer; }
+    footer { color: var(--muted); padding: .25rem .25rem 1.25rem; }
+
+    @media (max-width: 54rem) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: static; max-height: none; }
+      nav ul { display: flex; flex-wrap: wrap; gap: 0 .3rem; }
+      .ref { grid-template-columns: 1fr; }
+      .ref figure { position: static; max-width: 22rem; }
+    }
+    @media print {
+      :root { color-scheme: light !important; }
+      body, .hero, section { background: #fff; color: #000; }
+      .hero { padding: 0; } .hero > p, .eyebrow { color: #000; }
+      nav, .skip, .paths, .theme-picker, dialog { display: none; }
+      .layout { display: block; padding: 0; }
+      section { border: 0; padding: 0; }
+      figure, .steps > li { break-inside: avoid; }
+    }
+  </style>
+  <script>
+    const themeKey = 'duik-effectcraft-docs-theme';
+    function applyTheme(theme) {
+      if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
+      else delete document.documentElement.dataset.theme;
+    }
+    try { applyTheme(localStorage.getItem(themeKey)); } catch { /* System theme still works. */ }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#guide">Skip to guide</a>
+  <header class="hero" id="top">
+    <div class="hero-bar">
+      <p class="eyebrow">User guide · EffectCraft 0.24.1</p>
+      <label class="theme-picker" hidden>Theme
+        <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+      </label>
+    </div>
+    <h1>Duik for EffectCraft</h1>
+    <p>A dockable panel that rigs and animates your layers: bones, IK arms and legs, follow-through tails, controllers, cameras, and expression tools. New here? Follow the three steps below in order.</p>
+    <div class="paths">
+      <a href="#install"><span class="n">1</span><b>Install the panel</b><span>Takes about 2 minutes.</span></a>
+      <a href="#guide-arm"><span class="n">2</span><b>Rig your first arm</b><span>A 10-minute hands-on guide.</span></a>
+      <a href="#reference"><span class="n">3</span><b>Look up any tool</b><span>Every button, tab by tab.</span></a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="On this page">
+      <p>Get started</p>
+      <ul>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#tour">Panel tour</a></li>
+        <li><a href="#ideas">Five key ideas</a></li>
+      </ul>
+      <p>Guides</p>
+      <ul>
+        <li><a href="#guide-arm">1. Rig an arm</a></li>
+        <li><a href="#guide-tail">2. Floppy tail</a></li>
+        <li><a href="#guide-connector">3. Slider-driven fade</a></li>
+        <li><a href="#guide-camera">4. Parallax camera</a></li>
+      </ul>
+      <p>Reference</p>
+      <ul>
+        <li><a href="#ref-rigging">Rigging</a></li>
+        <li><a href="#ref-armature">Armature</a></li>
+        <li><a href="#ref-constraints">Constraints</a></li>
+        <li><a href="#ref-animation">Animation</a></li>
+        <li><a href="#ref-automation">Automation</a></li>
+        <li><a href="#ref-layers">Layers</a></li>
+        <li><a href="#ref-camera">Camera</a></li>
+      </ul>
+      <p>Help</p>
+      <ul>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#limits">What's not included</a></li>
+      </ul>
+    </nav>
+
+    <main id="guide">
+      <p class="part">Get started</p>
+
+      <section id="install">
+        <h2>Install the panel</h2>
+        <div class="meta"><span class="chip">About 2 minutes</span><span class="chip">One-time setup</span></div>
+        <p>You need EffectCraft 0.24.1 or later, installed in <code>C:\Program Files\ArtCraft\EffectCraft</code> by default. The plug-in is the <code>plug-in</code> folder inside this project.</p>
+        <ol class="steps">
+          <li>
+            <h4>Open the Effect menu</h4>
+            <p>Choose <strong>Effect → Install Effect Plug-in Bundle (Folder)…</strong>. Pick this item, not plain <em>Install Effect Plug-in…</em>; that one expects a single <code>.wasm</code> file.</p>
+            <figure class="narrow"><img src="images/install-1-menu.png" width="560" height="300" alt="EffectCraft Effect menu open, with Install Effect Plug-in Bundle (Folder) highlighted."><figcaption>The Effect menu. The highlighted item installs a whole folder.</figcaption></figure>
+          </li>
+          <li>
+            <h4>Select the <code>plug-in</code> folder</h4>
+            <p>Go to the <code>Duik for EffectCraft</code> folder of your download. Click the <strong>plug-in</strong> folder <span class="callout-n">1</span> once, then click <strong>Select Folder</strong> <span class="callout-n">2</span>. Select the folder itself; don't open it and pick the <code>.jsx</code> file.</p>
+            <figure><img src="images/install-2-folder.png" width="795" height="535" loading="lazy" alt="Windows Select Folder dialog in the effectcraft folder, with plug-in selected and the Select Folder button highlighted."><figcaption>The folder picker. <code>docs</code> and <code>src</code> are not plug-ins; choose <code>plug-in</code>.</figcaption></figure>
+          </li>
+          <li>
+            <h4>Open the panel from the Window menu</h4>
+            <p>Choose <strong>Window → Duik for EffectCraft.jsx</strong>. It's near the bottom, with the other script panels.</p>
+            <figure class="tall"><img src="images/install-3-window-menu.png" width="600" height="1000" loading="lazy" alt="EffectCraft Window menu with Duik for EffectCraft.jsx highlighted near the bottom."><figcaption>Script panels are listed at the end of the Window menu.</figcaption></figure>
+          </li>
+          <li>
+            <h4>Dock it and open a composition</h4>
+            <p>The panel opens as a dockable panel. EffectCraft reopens it the next time you start the app. Create or open a composition before clicking any tool: every tool works on the active composition.</p>
+            <figure><img src="images/panel-docked.png" width="1920" height="1032" loading="lazy" alt="EffectCraft main window with the Duik for EffectCraft panel docked on the right, highlighted."><figcaption>The panel docked on the right of the Default workspace.</figcaption></figure>
+          </li>
+        </ol>
+        <div class="check"><p><strong>It worked if</strong> the panel shows a row of seven icons and the word <em>Rigging</em> next to them, with <em>Ready.</em> under the buttons.</p></div>
+        <details>
+          <summary>Updating to a newer build</summary>
+          <p>EffectCraft won't overwrite a panel that's already installed. Delete <code>%APPDATA%\EffectCraft\Scripts\ScriptUI Panels\Duik for EffectCraft.jsx</code>, restart EffectCraft, then install again. Developers: run <code>Build-Bundle.ps1</code> first after editing files in <code>src\</code>.</p>
+        </details>
+        <details>
+          <summary>Do I need a .wasm file, After Effects, or Duik itself?</summary>
+          <p>No. The bundle is one script panel. It builds native EffectCraft layers, effect controls, and expressions. It doesn't run After Effects, can't open existing Duik rigs, and doesn't use <code>.ffx</code> presets.</p>
+        </details>
+      </section>
+
+      <section id="tour">
+        <h2>Panel tour</h2>
+        <p>The panel has seven sections. Switch between them with the icon bar at the top. Hover an icon to see its name; the current section's name also shows beside the icons.</p>
+        <figure class="narrow"><img src="images/icon-bar.png" width="410" height="64" alt="The seven section icons: Rigging, Armature, Constraints, Animation, Automation, Layers, Camera."></figure>
+        <ol class="icons">
+          <li><a href="#ref-rigging"><strong>Rigging</strong></a>: IK limbs and body-part templates</li>
+          <li><a href="#ref-armature"><strong>Armature</strong></a>: bones from artwork, binding, follow</li>
+          <li><a href="#ref-constraints"><strong>Constraints</strong></a>: connector, effector, lock, pins</li>
+          <li><a href="#ref-animation"><strong>Animation</strong></a>: easing, tweening, key cleanup</li>
+          <li><a href="#ref-automation"><strong>Automation</strong></a>: wiggle, spring, loop, wheel, bake</li>
+          <li><a href="#ref-layers"><strong>Layers</strong></a>: controllers, zero parents, rename</li>
+          <li><a href="#ref-camera"><strong>Camera</strong></a>: 2D parallax camera, 3D camera rig</li>
+        </ol>
+        <div class="note"><p><strong>Read the status line.</strong> Every section has a message under its buttons. After each click it says what happened, such as <em>Arm ready. Bind artwork to its bones; animate Arm - Wrist.</em>, or what to select instead.</p></div>
+      </section>
+
+      <section id="ideas">
+        <h2>Five key ideas</h2>
+        <p>Most "nothing happened" moments come from one of these. Read them once before the guides.</p>
+        <dl class="gloss">
+          <div><dt>1. Order means timeline order</dt><dd>"Top" and "root to tip" refer to layer order in the timeline. Click order and canvas position don't matter.</dd></div>
+          <div><dt>2. Layers, properties, or keys</dt><dd>Some tools want selected layers. Others want a selected property (such as Position) or selected keyframes. The reference says which.</dd></div>
+          <div><dt>3. Set the pivot first</dt><dd>A limb rotates around its Anchor Point. Put it on the joint (shoulder, elbow) before you build a rig.</dd></div>
+          <div><dt>4. Build in the rest pose</dt><dd>Tools measure lengths and angles at the current frame. Build with the character in its neutral pose.</dd></div>
+          <div><dt>5. Animate the controller</dt><dd>Rigs drive layers with expressions. Keyframe the target or bone null, not the layers it drives.</dd></div>
+        </dl>
+        <dl class="gloss">
+          <div><dt>Null</dt><dd>An invisible layer with a transform. Used as a bone, target, or controller.</dd></div>
+          <div><dt>IK (inverse kinematics)</dt><dd>Move the hand; the elbow works out its own bend.</dd></div>
+          <div><dt>FK (forward kinematics)</dt><dd>Rotate each joint yourself; children follow.</dd></div>
+          <div><dt>Expression</dt><dd>A formula on a property. Saved in your <code>.ecproj</code>.</dd></div>
+        </dl>
+      </section>
+
+      <p class="part">Guides</p>
+
+      <section id="guide-arm">
+        <h2>Guide 1: Rig an arm with IK</h2>
+        <div class="meta"><span class="chip">About 10 minutes</span><span class="chip">Rigging + Armature tabs</span><span class="chip">Beginner</span></div>
+        <p>You'll make a two-bone arm, attach artwork, and animate it by moving only the wrist. The example uses simple shape layers: a body, an upper arm, and a forearm with a hand.</p>
+        <ol class="steps">
+          <li>
+            <h4>Create the arm template</h4>
+            <p>Make a new composition. 1920 × 1080 works well: the template scales to the comp, so null outlines stay small next to the art. In the panel, open <strong>Rigging</strong>, leave the dropdown on <strong>Arm</strong>, and click <strong>Create Template</strong> <span class="callout-n">1</span>.</p>
+            <p>Three nulls appear <span class="callout-n">2</span>: <strong>Arm - Shoulder</strong> and <strong>Arm - Elbow</strong> are bones; <strong>Arm - Wrist</strong> is the target you'll animate.</p>
+            <figure><img src="images/arm-1-template.png" width="1920" height="1032" loading="lazy" alt="Rigging tab with Arm and Create Template highlighted; the timeline lists Arm - Shoulder, Arm - Elbow and Arm - Wrist."><figcaption>The template nulls are invisible in renders. Their outlines show in the viewer while selected.</figcaption></figure>
+          </li>
+          <li>
+            <h4>Add artwork over the bones</h4>
+            <p>Add one layer for the upper arm (shoulder to elbow) and one for the forearm (elbow to wrist). Put each layer's Anchor Point exactly on its joint: the upper arm's on the shoulder null, the forearm's on the elbow null.</p>
+            <p><strong>Tip:</strong> give each limb a rounded end centred on its joint. The pieces then overlap cleanly at any elbow angle, with no gap or corner showing.</p>
+            <p>Keep both art layers unlocked, unparented, and 2D, with no keyframes or expressions on their transforms. Place them <em>below</em> the nulls in the timeline.</p>
+            <figure><img src="images/arm-2-art.png" width="1920" height="1032" loading="lazy" alt="A simple character: dark-blue body and round head, a blue upper arm from the shoulder to the elbow, and a teal forearm ending in a hand; timeline shows the art layers below the three nulls."><figcaption>Joint dots sit exactly on the Shoulder and Elbow nulls. The Body layer stays unbound: it doesn't move with the arm.</figcaption></figure>
+          </li>
+          <li>
+            <h4>Bind each piece to its bone</h4>
+            <p>Open the <strong>Armature</strong> tab. Select <strong>Arm - Shoulder</strong> and <strong>Upper Arm Art</strong>, then click <strong>Bind Artwork to Bone</strong> <span class="callout-n">1</span>. Then select <strong>Arm - Elbow</strong> and <strong>Forearm Art</strong> and click it again.</p>
+            <p>The <strong>Parent &amp; Link</strong> column <span class="callout-n">2</span> now shows each art layer parented to its bone. The artwork doesn't move.</p>
+            <figure><img src="images/arm-3-bound.png" width="1920" height="1032" loading="lazy" alt="Armature tab with Bind Artwork to Bone highlighted; timeline Parent column shows 1. Arm - Shoulder and 2. Arm - Elbow."><figcaption>Status line: <em>Bound 1 artwork layer(s) to Arm - Elbow.</em></figcaption></figure>
+          </li>
+          <li>
+            <h4>Animate the wrist</h4>
+            <p>Select <strong>Arm - Wrist</strong>. Add a <strong>Position</strong> keyframe at frame 0. Go to 1 second and drag the wrist to a new spot; a second key is added. Scrub the timeline.</p>
+            <p>The Effect Controls panel <span class="callout-n">1</span> shows the rig's switches. Leave <strong>Use FK</strong> off for now. The wrist's keyframes <span class="callout-n">2</span> drive the whole arm.</p>
+            <figure><img src="images/arm-4-animated.png" width="1920" height="1032" loading="lazy" alt="Arm bent at the elbow following the moved wrist; Effect Controls list Use FK, FK Shoulder, FK Elbow, Flip IK Bend and Stretch IK."><figcaption>At 1 second the elbow bends so the forearm tip meets the wrist target.</figcaption></figure>
+          </li>
+        </ol>
+        <div class="check"><p><strong>It worked if</strong> the elbow bends by itself as you move the wrist, and both art layers follow.</p></div>
+        <div class="pair">
+          <figure><img src="images/arm-5-reach.png" width="840" height="530" loading="lazy" alt="Arm fully straight, stopping short of the wrist target."><figcaption><strong>Target out of reach:</strong> the arm straightens and stops. Turn on <strong>Stretch IK</strong> to let it scale instead.</figcaption></figure>
+          <div>
+            <h3>Try next</h3>
+            <ul>
+              <li><strong>Reverse the bend:</strong> tick <strong>Flip IK Bend</strong> on the wrist.</li>
+              <li><strong>Switch to FK without a jump:</strong> at a frame where the arm is within reach, select the three template nulls and click <strong>Rigging → Match Pose and Switch IK/FK</strong>. Then animate <strong>FK Shoulder</strong> and <strong>FK Elbow</strong>.</li>
+              <li><strong>Legs:</strong> same steps, choose <strong>Leg</strong>. The nulls are Hip, Knee, and Ankle.</li>
+              <li><strong>Your own artwork order:</strong> see <a href="#ref-rigging">Build Two-Bone IK</a> to rig existing limb layers without a template.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="guide-tail">
+        <h2>Guide 2: Floppy tail with overlap</h2>
+        <div class="meta"><span class="chip">About 5 minutes</span><span class="chip">Armature tab</span><span class="chip">Beginner</span></div>
+        <p>You'll turn five art segments into a chain that swings with follow-through, while animating only one rotation.</p>
+        <ol class="steps">
+          <li>
+            <h4>Lay out the segments</h4>
+            <p>Make 2–16 layers in a row, such as <strong>Tail 1</strong> to <strong>Tail 5</strong>. Set each Anchor Point at the end nearest the body, exactly where it meets the previous segment. Taper them toward the tip and round their ends so the joints stay smooth. In the timeline, order them root to tip: <strong>Tail 1</strong> highest. Leave the body layer unselected.</p>
+          </li>
+          <li>
+            <h4>Build the chain</h4>
+            <p>Select all segments. In <strong>Armature</strong>, click <strong>Build Overlapping FK</strong> <span class="callout-n">1</span>. A bone null is created for each segment, parented in a chain.</p>
+          </li>
+          <li>
+            <h4>Animate the root bone</h4>
+            <p>Select <strong>Bone - Tail 1</strong>. Keyframe its <strong>Rotation</strong>: −30° at 0 s, 20° at 1 s, −30° at 2 s. In Effect Controls <span class="callout-n">2</span>, set <strong>Delay Frames</strong> to 3. Leave <strong>Overlap Amount</strong> at 100.</p>
+            <figure><img src="images/tail-overlap.png" width="1920" height="1032" loading="lazy" alt="A cartoon fox whose five tapered tail segments curve with lag toward the cream tip; Build Overlapping FK and the Delay Frames and Overlap Amount controls are highlighted."><figcaption>Mid-swing, each segment trails the one before it.</figcaption></figure>
+          </li>
+        </ol>
+        <div class="check"><p><strong>It worked if</strong> the tip lags behind the base when you scrub. Set <strong>Overlap Amount</strong> to 0 to compare with stiff FK.</p></div>
+        <p class="note">For a tail without artwork yet, use <strong>Rigging → Tail</strong> (or <strong>Hair</strong>) → <strong>Create Template</strong>. Then bind artwork to each bone, as in Guide 1.</p>
+      </section>
+
+      <section id="guide-connector">
+        <h2>Guide 3: Fade a layer with a slider</h2>
+        <div class="meta"><span class="chip">About 5 minutes</span><span class="chip">Constraints tab</span><span class="chip">Intermediate</span></div>
+        <p>The <strong>Connector</strong> lets one property play another property's keyframes. Here a null's X position controls a fade.</p>
+        <ol class="steps">
+          <li>
+            <h4>Make the animation to control</h4>
+            <p>On an art layer (here <strong>Ghost</strong>), add two <strong>Opacity</strong> keys: 0% then 100%. Timing doesn't matter; only the first and last key values do.</p>
+          </li>
+          <li>
+            <h4>Pick the driver</h4>
+            <p>Add a null named <strong>Fader</strong> at the left end of a slider track (here X = 640). Parent a knob shape to it so you can see it. In the timeline, select the Fader's <strong>Position</strong> property (not the layer). Open <strong>Constraints</strong> and click <strong>Set Driver</strong> <span class="callout-n">1</span>. The label changes to <em>Fader › Position</em>. Leave the axis on <strong>X</strong>.</p>
+          </li>
+          <li>
+            <h4>Set the range and connect</h4>
+            <p>Type the track ends: <strong>640</strong> in <strong>From</strong> and <strong>1280</strong> in <strong>To</strong> <span class="callout-n">2</span>. Select only Ghost's <strong>Opacity</strong> property, then click <strong>Connect Keys to Driver</strong> <span class="callout-n">3</span>.</p>
+            <figure><img src="images/connector-1.png" width="1920" height="1032" loading="lazy" alt="Constraints tab showing Set Driver with Fader › Position, From 640 To 1280 on X, and Connect Keys to Driver highlighted; a faint ghost above a slider track."><figcaption>Status line: <em>Connected 1 property(ies). Driver 640–1280 spans their keys.</em></figcaption></figure>
+          </li>
+          <li>
+            <h4>Drag the Fader</h4>
+            <p>Drag Fader along the track. At the left end (X = 640) Ghost is invisible; at the right end (X = 1280) it's fully visible. Past either end, the value stays at that end.</p>
+            <figure class="narrow"><img src="images/connector-2.png" width="840" height="530" loading="lazy" alt="The orange knob three-quarters along the track and the ghost mostly visible."><figcaption>Fader at X = 1120, three-quarters along: Ghost is at 75% opacity.</figcaption></figure>
+          </li>
+        </ol>
+        <div class="check"><p><strong>Use it for</strong> facial expressions, hand poses, or any keyed motion you want on one dial. A slider effect or angle control works as the driver too.</p></div>
+      </section>
+
+      <section id="guide-camera">
+        <h2>Guide 4: Parallax with a 2D camera</h2>
+        <div class="meta"><span class="chip">About 5 minutes</span><span class="chip">Camera tab</span><span class="chip">Beginner</span></div>
+        <ol class="steps">
+          <li>
+            <h4>Select the scene layers</h4>
+            <p>Build a flat scene in layers, such as sun, clouds, mountains, hills, and a tree. Select all of them. They must be 2D and unparented.</p>
+          </li>
+          <li>
+            <h4>Add the camera</h4>
+            <p>In <strong>Camera</strong>, click <strong>Add 2D Camera</strong> <span class="callout-n">1</span>. A <strong>2D Camera</strong> null is added. Its Effect Controls show <strong>Zoom</strong> <span class="callout-n">2</span>.</p>
+          </li>
+          <li>
+            <h4>Set each layer's depth</h4>
+            <p>Each scene layer now has a <strong>Camera Depth</strong> control. Use 100 for the foreground (moves fully), lower values further back. The example uses Tree 100, Hills 65, Mountains 35, Clouds 20, Sun 5.</p>
+          </li>
+          <li>
+            <h4>Animate the camera</h4>
+            <p>Keyframe the 2D Camera's <strong>Position</strong>, <strong>Rotation</strong>, or <strong>Zoom</strong>.</p>
+            <figure><img src="images/camera-2d.png" width="1920" height="1032" loading="lazy" alt="Layered landscape with sun, clouds, mountains, hills and a tree; Add 2D Camera and the Zoom control are highlighted; timeline shows 2D Camera above the five scene layers."><figcaption>Mid-move: the tree shifts the most, the mountains less, and the sun barely moves.</figcaption></figure>
+          </li>
+        </ol>
+        <div class="check"><p><strong>It worked if</strong> near layers slide faster than far layers when the camera moves.</p></div>
+      </section>
+
+      <p class="part" id="reference">Reference</p>
+
+      <section id="ref-rigging">
+        <h2>Rigging</h2>
+        <div class="ref">
+          <figure><img src="images/tab-rigging.png" width="480" height="450" loading="lazy" alt="Rigging tab buttons."></figure>
+          <div>
+            <p>For custom rigs, use unlocked, unparented 2D layers. Order them root to tip in the timeline, followed by the nulls each tool asks for. Set pivots and target positions first.</p>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>Select first</th><th>Then animate</th></tr></thead>
+              <tbody>
+                <tr><td>Create Template</td><td>Nothing. Choose a part in the dropdown.</td><td><strong>Arm/Leg:</strong> wrist or ankle Position (two-bone IK/FK). <strong>Spine</strong> (5 bones), <strong>Tail</strong> (5), <strong>Hair</strong> (4): bone Rotation. Tail and Hair have Delay Frames and Overlap Amount on the root.</td></tr>
+                <tr><td>Build Two-Bone IK</td><td>Upper limb, lower limb, target null. Anchors at shoulder and elbow; target at the tip.</td><td>Target Position. Upper limb Position moves the shoulder. The starting elbow side sets the bend.</td></tr>
+                <tr><td>Build Two-Bone IK/FK</td><td>Same as above.</td><td>IK: target Position. With <strong>Use FK</strong> on: <strong>FK Shoulder</strong> and <strong>FK Elbow</strong>. Also has <strong>Flip IK Bend</strong> and <strong>Stretch IK</strong>.</td></tr>
+                <tr><td>Match Pose and Switch IK/FK</td><td>The rig's three layers, at the switch frame.</td><td>Keys the other mode to match the pose and flips <strong>Use FK</strong>, in one undo step.</td></tr>
+                <tr><td>Build One-Bone IK/FK</td><td>One limb above its target null.</td><td>Target Position aims the limb. <strong>Use FK</strong> + <strong>FK Rotation</strong> for FK. No stretch.</td></tr>
+                <tr><td>Build Three-Bone IK</td><td>Three limbs, then a target at the last tip.</td><td>Target Position. <strong>Lead Angle</strong> biases the first joint; <strong>Flip Tail Bend</strong> reverses the end. IK only.</td></tr>
+                <tr><td>Build Bézier IK</td><td>2–16 limbs, then start handle, end handle, tip nulls.</td><td>Handle and tip Positions shape the curve; first limb Position moves the root.</td></tr>
+                <tr><td>Build Bézier FK</td><td>2–16 limbs, then root, start handle, end handle, tip nulls.</td><td>Root Position/Rotation move the curve; tip Rotation turns the end tangent.</td></tr>
+                <tr><td>Group IK/FK Rigs Under Master</td><td>Target nulls of unparented two-bone IK/FK rigs.</td><td>The new <strong>Rig Master</strong> Position or Rotation moves them together. Keys are kept.</td></tr>
+              </tbody>
+            </table></div>
+            <details><summary>Rules for two-bone rigs</summary>
+              <p>Keep layer names unique. Don't rename the upper layer, target, or generated controls unless you fix the expressions; use <a href="#ref-layers">Layers → Rename</a> instead. Lower-limb Position and both Rotations must not be keyed or driven; IK/FK also needs unkeyed Scale on both limbs. Changing artwork, anchors, or base scale later doesn't update limb lengths: rebuild. FK → IK can't match a fully folded pose. Bring a stretched pose back within reach before matching to FK. Rigs built before pose matching existed still work but can't auto-match.</p>
+            </details>
+            <details><summary>Bézier rigs in detail</summary>
+              <p>Joints are spread by approximate curve length, weighted by the setup segment lengths. Each segment rotates and scales uniformly between its joints; the artwork itself doesn't bend. Driven Position, Rotation, and Scale must be unkeyed at setup. In Bézier FK, the nulls stay independent: root Rotation changes the rig, not the visible positions of the other nulls. Neither has IK/FK switching or Auto-Curve.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-armature">
+        <h2>Armature</h2>
+        <div class="ref">
+          <figure><img src="images/tab-armature.png" width="480" height="450" loading="lazy" alt="Armature tab buttons."></figure>
+          <div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>Select first</th><th>Result</th></tr></thead>
+              <tbody>
+                <tr><td>Build FK Armature from Artwork</td><td>2+ unparented 2D art layers with static transforms, root to tip.</td><td>A bone null at each pivot, chained; art bound in place. Animate bone Rotation.</td></tr>
+                <tr><td>Build Overlapping FK</td><td>Same, 2–16 layers.</td><td>Animate root Rotation. <strong>Delay Frames</strong> = lag per joint; <strong>Overlap Amount</strong> 0 (stiff) to 100 (full lag). See <a href="#guide-tail">Guide 2</a>.</td></tr>
+                <tr><td>Bind Artwork to Bone</td><td>A bone null, then an unparented static art layer below it.</td><td>Art is parented to the bone without moving.</td></tr>
+                <tr><td>Aim at Driver (Keep Offset)</td><td>A uniquely named driver at the top, then followers.</td><td>Follower Rotation points at the driver, keeping its starting angle.</td></tr>
+                <tr><td>Follow Driver Position</td><td>Same.</td><td>Follower Position moves with the driver, keeping its offset.</td></tr>
+                <tr><td>Add Weighted Parent Constraint</td><td>Driver on top, then followers, at the setup frame.</td><td>Key <strong>Parent Weight</strong>: 0 = own animation, 100 = follow the driver's Position and Rotation. One driver; no scale.</td></tr>
+                <tr><td>Follow Selected Mask Path</td><td>Mask layer on top, followers, and exactly one <strong>Mask Path</strong> property.</td><td>Key <strong>Path Progress</strong> 0–100; <strong>Orient to Path</strong> adds the tangent angle. Shape paths aren't supported.</td></tr>
+              </tbody>
+            </table></div>
+            <p class="note">Followers need no keys or expressions on the property being driven.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-constraints">
+        <h2>Constraints</h2>
+        <div class="ref">
+          <figure><img src="images/tab-constraints.png" width="480" height="450" loading="lazy" alt="Constraints tab with Set Driver, From, To, axis, and tool buttons."></figure>
+          <div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>Select first</th><th>Result</th></tr></thead>
+              <tbody>
+                <tr><td>Set Driver</td><td>One property: Position, X/Y Position, Rotation, Scale, Opacity, Anchor Point, or an effect control.</td><td>Stored as the driver. Vectors use the axis dropdown.</td></tr>
+                <tr><td>Connect Keys to Driver</td><td>Properties with 2+ keys and no expressions.</td><td>Driver at <strong>From</strong> = first key; at <strong>To</strong> = last key; clamped outside. See <a href="#guide-connector">Guide 3</a>.</td></tr>
+                <tr><td>Effector</td><td>Properties with 2+ keys.</td><td>An <strong>Effector</strong> null: inside <strong>Inner Radius</strong> = last key, beyond <strong>Outer Radius</strong> = first key.</td></tr>
+                <tr><td>Lock</td><td>Properties.</td><td>An expression holds the current value. Not the timeline layer lock.</td></tr>
+                <tr><td>Reset Transform</td><td>Layers.</td><td>Rotation 0, Scale 100%, and Position 0 if parented. Keyed properties get a key.</td></tr>
+                <tr><td>Align to Top</td><td>Layers; the target highest.</td><td>Moves the others to the top layer's anchor, parent-aware.</td></tr>
+                <tr><td>Pin Path Vertices</td><td>One unkeyed <strong>Mask Path</strong> or shape <strong>Path</strong>.</td><td>A pin null per vertex plus In/Out handle nulls. Move pins to deform. Puppet pins aren't scriptable in EffectCraft.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-animation">
+        <h2>Animation</h2>
+        <div class="ref">
+          <figure><img src="images/tab-animation.png" width="480" height="450" loading="lazy" alt="Animation tab with interpolation buttons, Ease %, Tween % and key tools."></figure>
+          <div>
+            <p>Interpolation buttons need selected <strong>keyframes</strong>. Other tools use selected keyed properties, or every animated property of the selected layers if no property is selected.</p>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td>Linear · Ease In · Ease Out · Easy Ease · Hold · Smooth</td><td>Sets temporal interpolation. <strong>Ease %</strong> sets influence.</td></tr>
+                <tr><td>Straight Path</td><td>Removes spatial tangents on selected Position keys.</td></tr>
+                <tr><td>Rove</td><td>Makes inner spatial keys rove in time.</td></tr>
+                <tr><td>Tween</td><td>Adds a key at the playhead, <strong>Tween %</strong> between the surrounding keys (50 = midpoint).</td></tr>
+                <tr><td>Freeze Pose</td><td>Copies the previous key to the playhead.</td></tr>
+                <tr><td>Snap Keys</td><td>Moves keys onto whole frames.</td></tr>
+                <tr><td>Sync Keys</td><td>Shifts each property's selected keys so the first lands on the playhead.</td></tr>
+                <tr><td>Clean Keys</td><td>Removes keys that repeat both neighbours.</td></tr>
+                <tr><td>Sequence Layers</td><td>Offsets selected layers by <strong>Frames</strong>, in timeline order.</td></tr>
+                <tr><td>Exposure</td><td>Holds each pose for <strong>Frames</strong> frames (animating on 2s, 3s…).</td></tr>
+                <tr><td>Copy Anim · Paste Anim</td><td>Copies animation relative to the playhead; pastes onto matching properties of selected layers. Lasts while the panel is open.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-automation">
+        <h2>Automation</h2>
+        <div class="ref">
+          <figure><img src="images/tab-automation.png" width="480" height="450" loading="lazy" alt="Automation tab with wiggle, random, swink, spring, loop, wheel, trail and bake controls."></figure>
+          <div>
+            <p>Select numeric properties, not property groups. These tools never overwrite an existing expression.</p>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td>Wiggle</td><td>Continuous noise from the frequency and amplitude fields.</td></tr>
+                <tr><td>Random</td><td>A new random offset per dimension at each tick.</td></tr>
+                <tr><td>Swink</td><td>Swings around the value, or blinks between two values with <strong>Swink Blink</strong>.</td></tr>
+                <tr><td>Spring</td><td>Damped overshoot after each key, scaled by incoming speed. Controls are shared per layer.</td></tr>
+                <tr><td>Cycle Loop</td><td>Repeats 2+ keys before the first and after the last.</td></tr>
+                <tr><td>Roll Wheel</td><td>One unparented 2D wheel, anchor centred. Enter the radius in comp pixels. Horizontal travel turns it; <strong>Wheel follows curved motion</strong> uses path length (slower on long comps).</td></tr>
+                <tr><td>Motion Trail</td><td>A shape layer drawing recent motion; <strong>Trail Frames</strong> 2–240.</td></tr>
+                <tr><td>Move Away</td><td>A slider that pushes parented layers away from their parent's anchor.</td></tr>
+                <tr><td>Bake</td><td>Replaces expressions with per-frame linear keys, dropping redundant ones.</td></tr>
+                <tr><td>Toggle · Remove</td><td>Enables/disables or deletes expressions. With no expression property selected, acts on all of the selected layers.</td></tr>
+              </tbody>
+            </table></div>
+            <p class="warn">Bake and Remove destroy the live rig. Duplicate the composition first if you may want to edit it later.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-layers">
+        <h2>Layers</h2>
+        <div class="ref">
+          <figure><img src="images/tab-layers.png" width="480" height="450" loading="lazy" alt="Layers tab with controller shape, add buttons, rename fields and notes box."></figure>
+          <div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td>Add Controllers</td><td>One controller per selected unparented 2D layer, at its Position (or one at comp centre). <strong>Controller shape</strong>: Null, Circle, Square, Cross, or Arrows. Doesn't bind the art.</td></tr>
+                <tr><td>Add Zero Parents</td><td>A parent null at each layer's pivot; the art stays put and its local Position becomes 0.</td></tr>
+                <tr><td>Add Comp-Sized Solid · Add Adjustment Layer</td><td>Creates native EffectCraft layers.</td></tr>
+                <tr><td>Rename</td><td><strong>Find</strong>/<strong>Replace</strong>, <strong>Prefix</strong>, <strong>Suffix</strong>. Rejects duplicates and updates <code>layer("…")</code> references and rig data, so rigs keep working.</td></tr>
+                <tr><td>Save Notes · Load Notes</td><td>Stores the text box in the composition comment and reads it back.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ref-camera">
+        <h2>Camera</h2>
+        <div class="ref">
+          <figure><img src="images/tab-camera.png" width="480" height="450" loading="lazy" alt="Camera tab with Add 2D Camera and Rig 3D Camera."></figure>
+          <div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Button</th><th>Select first</th><th>Result</th></tr></thead>
+              <tbody>
+                <tr><td>Add 2D Camera</td><td>Unparented 2D layers.</td><td>A <strong>2D Camera</strong> null with Position, Rotation, <strong>Zoom</strong>. Each layer gets <strong>Camera Depth</strong> (100 full, 50 half, 0 fixed). See <a href="#guide-camera">Guide 4</a>.</td></tr>
+                <tr><td>Rig 3D Camera</td><td>An unparented camera with static Position and Point of Interest, or nothing.</td><td><strong>Camera Root</strong> moves/orbits, <strong>Camera Body</strong> places, <strong>Camera Target</strong> aims.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+      </section>
+
+      <p class="part">Help</p>
+
+      <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <details open><summary>The panel isn't in the Window menu.</summary>
+          <p>Install with <strong>Install Effect Plug-in Bundle (Folder)…</strong> and pick the <code>plug-in</code> folder, not the <code>.jsx</code> file. See <a href="#install">Install</a>.</p></details>
+        <details><summary>I click a button and nothing happens.</summary>
+          <p>Read the status line under the buttons. Open a composition first. Check whether the tool wants layers, a property, or keyframes selected (<a href="#ideas">key idea 2</a>).</p></details>
+        <details><summary>The rig won't build.</summary>
+          <p>Check timeline order, unique names, and that the layers are 2D, unparented, and unlocked. Driven properties must not already have keys or expressions.</p></details>
+        <details><summary>The elbow or knee bends the wrong way.</summary>
+          <p>On an IK/FK rig, tick <strong>Flip IK Bend</strong>. On a plain two-bone IK rig, rebuild with the joint on the intended side.</p></details>
+        <details><summary>The limb stops short of the target.</summary>
+          <p>The target is beyond reach. Move it closer or turn on <strong>Stretch IK</strong>. If you changed pivots, artwork, or scale after building, rebuild in the corrected rest pose.</p></details>
+        <details><summary>Moving the controller doesn't move the artwork.</summary>
+          <p>Check that the art is bound to the right bone (Parent &amp; Link column). On an IK/FK target, check <strong>Use FK</strong>: in FK mode, target Position does nothing.</p></details>
+        <details><summary>A rig broke after I renamed a layer.</summary>
+          <p>Restore the old name or fix the expression references. Use <a href="#ref-layers">Layers → Rename</a> for future renames. Don't rename generated effect controls.</p></details>
+        <details><summary>I can pin a shape path but not follow it.</summary>
+          <p><strong>Pin Path Vertices</strong> accepts mask or shape paths. <strong>Follow Selected Mask Path</strong> accepts mask paths only.</p></details>
+        <details><summary>I reinstalled but still get the old panel.</summary>
+          <p>EffectCraft won't overwrite an installed panel. Delete the old copy from <code>%APPDATA%\EffectCraft\Scripts\ScriptUI Panels</code>, restart, and install again.</p></details>
+      </section>
+
+      <section id="limits">
+        <h2>What's not included</h2>
+        <p>This panel recreates selected Duik workflows. It is not a full Duik port. Not included:</p>
+        <ul>
+          <li>Full-character autorig, 3D limb rigging, walk and run cycles.</li>
+          <li>Multi-parent constraints with pose-preserving switches, scale inheritance.</li>
+          <li>Importing Duik rigs from After Effects projects, or <code>.ffx</code> presets.</li>
+          <li>Puppet pins and time remapping (not exposed to EffectCraft scripts).</li>
+        </ul>
+        <p>See the <a href="../PARITY.md">parity tracker</a> for full coverage, and the <a href="../README.md">README</a> for build and test commands.</p>
+      </section>
+      <footer><a href="#top">Back to top ↑</a> · Screenshots taken in EffectCraft 0.24.1 on Windows.</footer>
+    </main>
+  </div>
+
+  <dialog id="zoom" aria-label="Enlarged screenshot"><button type="button" autofocus>Close ✕</button><img alt=""></dialog>
+  <script>
+    const picker = document.getElementById('theme');
+    picker.value = document.documentElement.dataset.theme || 'system';
+    picker.parentElement.hidden = false;
+    picker.addEventListener('change', () => {
+      applyTheme(picker.value);
+      try { localStorage.setItem(themeKey, picker.value); } catch { /* Theme still applies for this visit. */ }
+    });
+    // Click any screenshot to see it full size.
+    const zoom = document.getElementById('zoom'), zoomImg = zoom.querySelector('img');
+    document.querySelectorAll('figure img').forEach(img => {
+      img.tabIndex = 0;
+      const open = () => { zoomImg.src = img.src; zoomImg.alt = img.alt; zoom.showModal(); };
+      img.addEventListener('click', open);
+      img.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
+    zoom.addEventListener('click', () => zoom.close());
+  </script>
+</body>
+</html>

@@ -1,0 +1,257 @@
+function buildArmatureTab(panel) {
+    panel.orientation = "column";
+    panel.alignChildren = ["fill", "top"];
+    panel.add("statictext", undefined, "Timeline order: root to tip, or driver above followers.");
+    var status = panel.add("statictext", undefined, "Ready.", { name: "status", multiline: true });
+    status.preferredSize = [330, 52];
+
+    function selection(minimum) {
+        var comp = app.project.activeItem;
+        if (!(comp instanceof CompItem)) throw new Error("Open a composition first.");
+        var layers = comp.selectedLayers.slice().sort(function (a, b) { return a.index - b.index; });
+        if (layers.length < minimum) throw new Error("Select at least " + minimum + " layers.");
+        layers.forEach(function (layer) {
+            if (!(layer instanceof AVLayer) || layer.threeDLayer || layer.locked || layer.transform.position.dimensionsSeparated) {
+                throw new Error("Use unlocked 2D layers with combined Position.");
+            }
+        });
+        return { comp: comp, layers: layers };
+    }
+
+    function plain(property) { return !property.numKeys && !property.expression; }
+    function staticRoot(layer) {
+        var t = layer.transform;
+        if (layer.parent || ![t.position, t.rotation, t.scale, t.anchorPoint].every(plain)) {
+            throw new Error("Use unparented layers with static transforms: " + layer.name);
+        }
+    }
+
+    function button(label, id, run) {
+        panel.add("button", undefined, label, { name: id }).onClick = function () {
+            app.beginUndoGroup(label);
+            try { status.text = run(); }
+            catch (error) { status.text = error.message; }
+            finally { app.endUndoGroup(); }
+        };
+    }
+
+    function buildFk(overlap) {
+        var set = selection(2), comp = set.comp, layers = set.layers;
+        layers.forEach(staticRoot);
+        if (overlap && layers.length > 16) throw new Error("Select 2–16 artwork layers for overlapping FK.");
+        var bones = [];
+        try {
+            layers.forEach(function (art) {
+                var position = art.transform.position.value;
+                var name = "Bone - " + (overlap ? art.name.replace(/[\r\n]/g," ") : art.name), candidate = name;
+                for (var n = 2; comp.layer(candidate); n++) candidate = name + " " + n;
+                var bone = comp.layers.addNull();
+                bones.push(bone);
+                bone.name = candidate;
+                bone.transform.anchorPoint.setValue([0, 0]);
+                bone.transform.position.setValue(position);
+                if (bones.length > 1) bone.parent = bones[bones.length - 2];
+                art.parent = bone;
+            });
+            if (overlap) addOverlap(bones);
+        } catch (error) {
+            for (var j = bones.length - 1; j >= 0; j--) {
+                if (layers[j].parent === bones[j]) layers[j].parent = null;
+                bones[j].remove();
+            }
+            throw error;
+        }
+        return overlap ? "Overlap ready. Animate Rotation on " + bones[0].name + "." : "FK armature ready. Animate bone Rotation from root to tip.";
+    }
+
+    button("Build FK Armature from Artwork", "buildFk", function () { return buildFk(false); });
+    button("Build Overlapping FK", "buildOverlapFk", function () { return buildFk(true); });
+
+    button("Bind Artwork to Bone", "bindArt", function () {
+        var layers = selection(2).layers, bone = layers.shift();
+        if (!bone.nullLayer) throw new Error("Put the driver null above the artwork in the timeline.");
+        layers.forEach(function (art) {
+            if (art.nullLayer) throw new Error("Select artwork below the driver null.");
+            staticRoot(art);
+        });
+        var bound = [];
+        try {
+            layers.forEach(function (art) { art.parent = bone; bound.push(art); });
+        } catch (error) {
+            bound.forEach(function (art) { art.parent = null; });
+            throw error;
+        }
+        return "Bound " + layers.length + " artwork layer(s) to " + bone.name + ".";
+    });
+
+    function readDriver() {
+        var set = selection(2), driver = set.layers.shift();
+        if (!driver.name || /[\r\n]/.test(driver.name)) throw new Error("Use a nonempty, single-line driver name.");
+        for (var i = 1; i <= set.comp.numLayers; i++) {
+            if (i !== driver.index && set.comp.layer(i).name === driver.name) throw new Error("Driver name must be unique.");
+        }
+        if (driver.parent || driver.transform.position.expression) throw new Error("Driver must be unparented with no Position expression.");
+        return { comp: set.comp, driver: driver, followers: set.layers };
+    }
+
+    function constrain(aim) {
+        var set = readDriver(), layers = set.followers, driver = set.driver;
+        var p = driver.transform.position.value;
+        var source = "var d = thisComp.layer(" + JSON.stringify(driver.name) + ").transform.position;\n";
+        var edits = layers.map(function (layer) {
+            var t = layer.transform, prop = aim ? t.rotation : t.position;
+            if (layer.parent || !plain(prop) || !prop.canSetExpression || (aim && t.position.expression)) {
+                throw new Error("Use unparented followers without existing animation on the driven property.");
+            }
+            var at = t.position.value, dx = p[0] - at[0], dy = p[1] - at[1], code;
+            if (aim) {
+                if (dx * dx + dy * dy < 0.000001) throw new Error("Separate driver and follower pivots.");
+                var offset = prop.value - Math.atan2(dy, dx) * 180 / Math.PI;
+                code = source + "var p = transform.position; var x = d[0]-p[0], y = d[1]-p[1];\n" +
+                    "x*x+y*y < 0.000001 ? value : Math.atan2(y,x)*180/Math.PI + (" + offset + ");";
+            } else {
+                code = source + "[d[0]-(" + dx + "), d[1]-(" + dy + ")];";
+            }
+            return { prop: prop, code: code };
+        });
+        var applied = [];
+        try {
+            edits.forEach(function (edit) {
+                edit.prop.expression = edit.code;
+                applied.push(edit.prop);
+                if (edit.prop.expressionError) throw new Error(edit.prop.expressionError);
+            });
+        } catch (error) {
+            applied.forEach(function (p) { p.expression = ""; });
+            throw error;
+        }
+        return (aim ? "Aim" : "Position") + " constraint ready. Animate Position on " + driver.name + ".";
+    }
+
+    function weightedParent() {
+        var set = readDriver(), driver = set.driver, transform = driver.transform;
+        if (transform.rotation.expression) throw new Error("Remove the driver's Rotation expression first.");
+        var origin = transform.position.value, restAngle = transform.rotation.value;
+        var source = "var driver = thisComp.layer(" + JSON.stringify(driver.name) + ").transform;\n" +
+            'var weight = Math.max(0,Math.min(100,effect("Parent Weight")(1)*1))/100;\n' +
+            "var delta = driver.rotation-(" + restAngle + ");\n";
+        var position = source + "var p = driver.position, a = delta*Math.PI/180;\n" +
+            "var x = value[0]-(" + origin[0] + "), y = value[1]-(" + origin[1] + ");\n" +
+            "var c = Math.cos(a), s = Math.sin(a);\n" +
+            "[value[0]+weight*(p[0]+x*c-y*s-value[0]),value[1]+weight*(p[1]+x*s+y*c-value[1])];";
+        var followers = set.followers.map(function (layer) {
+            var t = layer.transform, effects = layer.property("ADBE Effect Parade");
+            if (layer.parent || [t.position,t.rotation].some(function (p) { return p.expression || !p.canSetExpression; })) {
+                throw new Error("Use unparented followers without Position or Rotation expressions.");
+            }
+            if (effects.property("Parent Weight") || !effects.canAddProperty("ADBE Slider Control")) {
+                throw new Error("Cannot add Parent Weight to " + layer.name + ".");
+            }
+            return { effects: effects, position: t.position, rotation: t.rotation };
+        });
+        var added = [], applied = [];
+        function write(prop, code) {
+            prop.expression = code;
+            applied.push(prop);
+            if (prop.expressionError) throw new Error(prop.expressionError);
+        }
+        try {
+            followers.forEach(function (f) {
+                var effect = f.effects.addProperty("ADBE Slider Control");
+                added.push(effect);
+                effect.name = "Parent Weight";
+                effect.property(1).setValue(100);
+                write(f.position, position);
+                write(f.rotation, source + "value+delta*weight;");
+            });
+        } catch (error) {
+            while (applied.length) applied.pop().expression = "";
+            while (added.length) added.pop().remove();
+            throw error;
+        }
+        return "Parent constraint ready. Keyframe Parent Weight on followers.";
+    }
+
+    function followMaskPath() {
+        var set = readDriver(), driver = set.driver;
+        var masks = driver.property("ADBE Mask Parade");
+        var paths = set.comp.selectedProperties.filter(function (p) {
+            return p instanceof Property && p.matchName === "ADBE Mask Shape" && p.propertyGroup(3) === driver;
+        });
+        if (paths.length !== 1) throw new Error("Select one Mask Path on the top selected layer.");
+        var path = paths[0], mask = path.parentProperty;
+        for (var i = 1; i <= masks.numProperties; i++) {
+            if (i !== mask.propertyIndex && masks.property(i).name === mask.name) throw new Error("Use a unique mask name.");
+        }
+        if (path.expression || path.value.vertices.length < 2) throw new Error("Use a Mask Path with at least two vertices and no expression.");
+        var controls = [["Path Progress", "ADBE Slider Control"], ["Orient to Path", "ADBE Checkbox Control"]];
+        var followers = set.followers.map(function (layer) {
+            var t = layer.transform, effects = layer.property("ADBE Effect Parade");
+            if (layer.parent || !plain(t.position) || !t.position.canSetExpression || t.rotation.expression || !t.rotation.canSetExpression) {
+                throw new Error("Use unparented followers with static Position and no Rotation expression.");
+            }
+            controls.forEach(function (control) {
+                if (effects.property(control[0]) || !effects.canAddProperty(control[1])) throw new Error("Cannot add " + control[0] + " to " + layer.name + ".");
+            });
+            return { effects: effects, position: t.position, rotation: t.rotation };
+        });
+        var source = "var layer = thisComp.layer(" + JSON.stringify(driver.name) + ");\n" +
+            "var path = layer.mask(" + JSON.stringify(mask.name) + ").maskPath;\n" +
+            'var u = Math.max(0,Math.min(100,effect("Path Progress")(1)*1))/100;\n' +
+            "var point = path.pointOnPath(u);\nvar p = layer.toComp(point);\n";
+        var added = [], applied = [];
+        function write(prop, code) {
+            prop.expression = code;
+            applied.push(prop);
+            if (prop.expressionError) throw new Error(prop.expressionError);
+        }
+        try {
+            followers.forEach(function (f) {
+                controls.forEach(function (control) {
+                    var effect = f.effects.addProperty(control[1]);
+                    added.push(effect);
+                    effect.name = control[0];
+                });
+                write(f.position, source + "[p[0],p[1]];");
+                write(f.rotation, source + 'if (effect("Orient to Path")(1)>0) {\n' +
+                    "var tangent = path.tangentOnPath(Math.max(0.00001,Math.min(0.99999,u)));\n" +
+                    "var q = layer.toComp([point[0]+tangent[0],point[1]+tangent[1]]);\n" +
+                    "var x = q[0]-p[0], y = q[1]-p[1];\n" +
+                    "x*x+y*y < 1e-12 ? value : value+Math.atan2(y,x)*180/Math.PI;\n} else { value; }");
+            });
+        } catch (error) {
+            while (applied.length) applied.pop().expression = "";
+            while (added.length) added.pop().remove();
+            throw error;
+        }
+        return "Path constraint ready. Keyframe Path Progress on followers.";
+    }
+
+    button("Aim at Driver (Keep Offset)", "aim", function () { return constrain(true); });
+    button("Follow Driver Position", "follow", function () { return constrain(false); });
+    button("Add Weighted Parent Constraint", "parentWeight", weightedParent);
+    button("Follow Selected Mask Path", "followPath", followMaskPath);
+}
+
+// Shared with the Rigging tab's FK templates.
+function addOverlap(bones) {
+    var root = bones[0], effects = root.property("ADBE Effect Parade");
+    function slider(name, value) {
+        var effect = effects.addProperty("ADBE Slider Control");
+        effect.name = name;
+        effect.property(1).setValue(value);
+    }
+    slider("Delay Frames", 2);
+    slider("Overlap Amount", 100);
+    // Local correction is the difference between adjacent delayed samples.
+    // Summed along the hierarchy, it gives each joint a progressively delayed world rotation.
+    var source = "var driver = thisComp.layer(" + JSON.stringify(root.name) + ");\n" +
+        'var dt = thisComp.frameDuration*Math.max(0,Math.min(120,driver.effect("Delay Frames")(1)*1));\n' +
+        'var amount = Math.max(0,Math.min(100,driver.effect("Overlap Amount")(1)*1))/100;\n' +
+        "var r = driver.transform.rotation;\n";
+    for (var i = 1; i < bones.length; i++) {
+        var p = bones[i].transform.rotation;
+        p.expression = source + "value + amount*(r.valueAtTime(time-" + i + "*dt)-r.valueAtTime(time-" + (i-1) + "*dt));";
+        if (p.expressionError) throw new Error(p.expressionError);
+    }
+}
