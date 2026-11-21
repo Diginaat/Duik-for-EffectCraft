@@ -2,11 +2,11 @@
 
 This EffectCraft plug-in bundle implements selected Duik-style workflows. It uses EffectCraft layers and expressions, not After Effects, Duik's runtime, or `.ffx` presets. It is not a complete Duik port or a converter for existing Duik rigs.
 
-**New to the panel?** Open the [HTML user guide](docs/index.html) in your browser. It works offline and includes a screenshot install walkthrough, four step-by-step guides (IK arm, overlapping tail, connector fade, parallax camera), and a tab-by-tab reference.
+**New to the panel?** Read the [user guide online](https://diginaat.github.io/Duik-for-EffectCraft/), or open [docs/index.html](docs/index.html) in your browser. It works offline and includes a screenshot install walkthrough, four step-by-step guides (IK arm, overlapping tail, connector fade, parallax camera), and a tab-by-tab reference.
 
 ## Install
 
-In EffectCraft 0.24.1, use **Effect → Install Effect Plug-in Bundle (Folder)…** and choose the `plug-in` folder. Open **Window → Duik for EffectCraft.jsx**. The bundle installs one dockable panel with **Rigging**, **Armature**, **Constraints**, **Animation**, **Automation**, **Layers**, and **Camera** sections. Switch sections with the icon bar at the top. The current section's name shows beside the icons, and hovering an icon shows its name. The sections are called tabs below. No `.wasm` module is needed: the pixel-effect ABI does not edit project layers.
+Download `Duik-for-EffectCraft-<version>.zip` from [GitHub Releases](https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest) and unzip it. In EffectCraft 0.24.1, use **Effect → Install Effect Plug-in Bundle (Folder)…** and choose the `plug-in` folder. Open **Window → Duik for EffectCraft.jsx**. The bundle installs one dockable panel with **Rigging**, **Armature**, **Constraints**, **Animation**, **Automation**, **Layers**, and **Camera** sections. Switch sections with the icon bar at the top. The current section's name shows beside the icons, and hovering an icon shows its name. The sections are called tabs below. No `.wasm` module is needed: the pixel-effect ABI does not edit project layers.
 
 ## Rigging tab
 

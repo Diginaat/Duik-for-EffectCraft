@@ -29,6 +29,8 @@
     .paths a:hover { background: #274172; }
     .paths b { display: block; font-size: 1.05rem; }
     .paths span { color: #c5d5f0; font-size: .9rem; }
+    .download { display: inline-block; margin-right: .8rem; background: var(--accent); color: var(--surface); font-weight: 700; text-decoration: none; padding: .45rem .95rem; border-radius: .45rem; }
+    .download:hover { filter: brightness(1.1); }
     .paths .n { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: #ff9f1c; color: #14233d; font-weight: 800; margin-bottom: .35rem; }
     .theme-picker { color-scheme: dark; font-size: .9rem; color: #e0e9fa; }
     .theme-picker select { font: inherit; color: inherit; background: #202f4b; border: 1px solid #657c9f; border-radius: .4rem; padding: .25rem .5rem; margin-left: .3rem; }
@@ -138,7 +140,7 @@
     <h1>Duik for EffectCraft</h1>
     <p>A dockable panel that rigs and animates your layers: bones, IK arms and legs, follow-through tails, controllers, cameras, and expression tools. New here? Follow the three steps below in order.</p>
     <div class="paths">
-      <a href="#install"><span class="n">1</span><b>Install the panel</b><span>Takes about 2 minutes.</span></a>
+      <a href="#install"><span class="n">1</span><b>Download &amp; install</b><span>Takes about 2 minutes.</span></a>
       <a href="#guide-arm"><span class="n">2</span><b>Rig your first arm</b><span>A 10-minute hands-on guide.</span></a>
       <a href="#reference"><span class="n">3</span><b>Look up any tool</b><span>Every button, tab by tab.</span></a>
     </div>
@@ -182,8 +184,13 @@
       <section id="install">
         <h2>Install the panel</h2>
         <div class="meta"><span class="chip">About 2 minutes</span><span class="chip">One-time setup</span></div>
-        <p>You need EffectCraft 0.24.1 or later, installed in <code>C:\Program Files\ArtCraft\EffectCraft</code> by default. The plug-in is the <code>plug-in</code> folder inside this project.</p>
+        <p>You need EffectCraft 0.24.1 or later, installed in <code>C:\Program Files\ArtCraft\EffectCraft</code> by default.</p>
         <ol class="steps">
+          <li>
+            <h4>Download the plug-in</h4>
+            <p>Get <strong>Duik-for-EffectCraft-<em>version</em>.zip</strong> from the <a href="https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest">latest release on GitHub</a>, then unzip it anywhere. The unzipped <code>Duik for EffectCraft</code> folder contains the <code>plug-in</code> folder you install in the next steps.</p>
+            <p><a class="download" href="https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest">Download from GitHub Releases</a> <a href="https://github.com/Diginaat/Duik-for-EffectCraft/releases">All releases</a></p>
+          </li>
           <li>
             <h4>Open the Effect menu</h4>
             <p>Choose <strong>Effect → Install Effect Plug-in Bundle (Folder)…</strong>. Pick this item, not plain <em>Install Effect Plug-in…</em>; that one expects a single <code>.wasm</code> file.</p>
@@ -568,9 +575,9 @@
           <li>Importing Duik rigs from After Effects projects, or <code>.ffx</code> presets.</li>
           <li>Puppet pins and time remapping (not exposed to EffectCraft scripts).</li>
         </ul>
-        <p>See the <a href="../PARITY.md">parity tracker</a> for full coverage, and the <a href="../README.md">README</a> for build and test commands.</p>
+        <p>See the <a href="https://github.com/Diginaat/Duik-for-EffectCraft/blob/duik-for-effectcraft/Duik%20for%20EffectCraft/PARITY.md">parity tracker</a> for full coverage, and the <a href="https://github.com/Diginaat/Duik-for-EffectCraft/blob/duik-for-effectcraft/Duik%20for%20EffectCraft/README.md">README</a> for build and test commands.</p>
       </section>
-      <footer><a href="#top">Back to top ↑</a> · Screenshots taken in EffectCraft 0.24.1 on Windows.</footer>
+      <footer><a href="#top">Back to top ↑</a> · <a href="https://github.com/Diginaat/Duik-for-EffectCraft/releases/latest">Download</a> · <a href="https://github.com/Diginaat/Duik-for-EffectCraft">Source on GitHub</a> · Screenshots taken in EffectCraft 0.24.1 on Windows.</footer>
     </main>
   </div>
 
